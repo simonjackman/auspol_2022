@@ -12,4 +12,5 @@ analysis/site_libs
 docs/analysis/sa1.*
 analysis/sa1.*
 data
+code/.R*
 /.quarto/
