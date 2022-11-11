@@ -222,8 +222,8 @@ nfa <- d_01 %>%
 
 
 d_01_16 <- read_csv(
-  file = "~/simonjackman@icloud.com - Google Drive/Shared drives/C200 TEAM: ANALYTICS/Polling/simon_jackman/results/data/2022/SA1/2016_GCP_SA1_for_AUS_short-header/2016 Census GCP Statistical Area 1 for AUST/2016Census_G01_AUS_SA1.csv"
-    ) %>% 
+  file = here("data/2022/SA1/2016_GCP_SA1_for_AUS_short-header/2016 Census GCP Statistical Area 1 for AUST/2016Census_G01_AUS_SA1.csv")
+  ) %>% 
   mutate(ccd_id = SA1_7DIGITCODE_2016)
 
 nfa_16 <- d_01_16 %>% 
