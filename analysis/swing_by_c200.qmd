@@ -1,0 +1,634 @@
+---
+title: "Swings by level of C200 support"
+date: now
+date-format: "h:mmA D MMMM YYYY"
+author: "Simon Jackman"
+format:
+  html:
+    theme:
+      - cosmo
+      - custom.scss
+    mainfont: Avenir
+    fontsize: 16px
+    toc: true
+    fig-width: 6.5
+    fig-height: 6.5
+    echo: false
+    code-tools: true
+    smooth-scroll: true
+    self-contained: true
+tbl-cap-location: bottom    
+crossref:
+  tbl-title: Table
+knitr: 
+  opts_knit: 
+    echo: FALSE
+    warnings: FALSE
+    message: FALSE
+execute:
+  keep-md: true
+  warning: false
+  error: false
+  echo: false
+---
+
+```{=html}
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+```
+```{=html}
+<script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.5"></script>
+```
+
+```{r setup,results='hide',message=FALSE}
+library(tidyverse)
+library(here)
+library(DT)
+
+source(here("code/goLive.R"))
+source(here("code/parse_functions.R"))
+load(here(paste("data",year,"working/latest.RData",sep="/")))
+
+c200 <- tribble(
+  ~Division,     ~candidate_id, ~support, ~elected,
+  "Boothby",     37700, "low",  "no",
+  "Bradfield",   36047, "medium", "no",
+  "Calare",      35951, "low", "no",
+  "Casey",       36746, "low", "no",
+  "Clark",       33553, "low", "yes",
+  "Cowper",      36245, "high", "no",
+  "Curtin",      36589, "high", "yes",
+  "Flinders",    37210, "low", "no",
+  "Goldstein",   36074, "high", "yes",
+  "Grey",        37725, "low", "no",
+  "Hughes",      36104, "medium", "no",
+  "Indi",        32086, "low", "yes",
+  "Kooyong",     36081, "high", "yes",
+  "Mackellar",   37450, "high", "yes",
+  "Mayo",        37710, "medium", "yes",
+  "North Sydney", 37452, "high", "yes",
+  "Page",       37568,  "medium", "no",
+  "Wannon",     33601,  "low", "no",
+  "Warringah",  32467,  "medium", "yes",
+  "Wentworth",   37451, "high", "yes"
+  ) %>%
+  left_join(candidates %>% 
+              select(Division,candidate_id,name,affiliation_abb,independent),
+            by=c("Division","candidate_id")
+  )
+
+
+latest <- data$timestamp
+```
+
+## C200 supported candidates
+
+C200 supported candidates ran in the following House of Representatives divisions, recording the first preference and two-candidate preferred vote shares indicated in the following table:
+
+```{r c200-tab}
+fp_rank <- data$fp %>%
+  filter(v>0) %>% 
+  group_by(Division) %>% 
+  mutate(r = n() + 1 - rank(as.double(v))) %>% 
+  ungroup()
+
+tab <- left_join(c200,
+                 data$fp,
+                 by=c("Division","candidate_id","name")) %>%
+  left_join(fp_rank %>%
+              select(Division,candidate_id,r),
+            by=c("Division","candidate_id")
+            ) %>% 
+  left_join(
+    data$tcp %>%
+      mutate(candidate_id=as.numeric(candidate_id)) %>%
+      rename(per_tcp=per),
+    by=c("Division","candidate_id")
+    ) %>%
+  arrange(Division) %>%
+  select(Division,name,party_group,per,r,per_tcp,support,elected) %>%
+  mutate(elected = if_else(elected=="yes","✅"," ")) %>%
+  mutate(support = ordered(support,
+                           levels=c("low","medium","high"),
+                           labels=c("1: low C200 support",
+                                    "2: medium C200 support",
+                                    "3: high C200 support")))
+
+datatable(tab,
+              extensions = c("Buttons","RowGroup"),
+              options = list(
+                dom="Bt",
+                buttons=c("copy","csv","excel"),
+                searching=FALSE,
+                pageLength=nrow(tab),
+                paging=FALSE,
+                orderFixed=list(list(6,'desc'),list(5,"asc")),
+                rowGroup=list(dataSrc=6),
+                columnDefs=list(
+                  list(className='dt-center',
+                       targets=c(2,7)),
+                  list(targets=6,
+                       visible=FALSE)
+                )
+              ),
+              colnames = c("Name"="name","Party"="party_group",
+              "FP%"="per","FP rank"="r",
+              "TCP%"="per_tcp"),
+              rownames = FALSE) %>%
+  formatRound(columns=5,digits=0) %>% 
+  formatRound(columns = c(4,6),digits=1)
+```
+
+## Swing by level of C200 support
+
+```{r,warning=FALSE,message=FALSE,fig.cap="Distribution of swings, by party, by level of C200 support for IND candidates.   Boxplots show medians (solid bar), 25th-75th percentiles (box) and extremes of the swings."}
+plotData <- data$fp %>%
+  group_by(Division,party_group) %>%
+  summarise(swing=sum(swing*v)/sum(v)) %>%
+  ungroup() %>%
+  left_join(c200 %>% 
+              select(Division,support),
+            by="Division") %>%
+  mutate(
+    support = replace_na(support,"none"),
+    support = ordered(support,
+                      levels=c("none","low","medium","high")
+    )
+  )
+
+g <- ggplot(plotData %>% 
+              filter(party_group %in% c("Coalition","Labor","GRN")),
+            aes(x=support,y=swing)
+            ) + 
+  geom_hline(yintercept=0) +
+  geom_boxplot() + 
+  facet_wrap(~party_group)
+
+g
+```
+
+```{r tab_summary,message=FALSE}
+tab <- plotData %>% 
+  filter(party_group %in% c("Coalition","Labor","GRN")) %>%
+  group_by(party_group,support) %>%
+  summarise(swing=mean(swing),n=n()) %>%
+  ungroup() %>%
+  pivot_wider(id_cols=party_group,names_from = support,values_from = c("swing","n"))
+
+tab <- bind_rows(
+  tab %>% 
+    mutate(what="Avg Swing") %>%
+    select(party_group,what,starts_with("swing_")) %>%
+    rename_with(~str_remove(.x,pattern="swing_"),
+                .cols=starts_with("swing_")),
+  tab %>%
+    mutate(what="# seats") %>%
+    select(party_group,what,starts_with("n_")) %>%
+    rename_with(~str_remove(.x,pattern="n_"),
+                .cols=starts_with("n_"))
+) %>%
+  arrange(party_group,desc(what))
+```
+
+### Summary statistics, average swings
+
+```{r,message=FALSE}
+tab <- plotData %>% 
+  filter(party_group %in% c("Coalition","Labor","GRN")) %>%
+  group_by(party_group,support) %>%
+  summarise(m=mean(swing),
+            min=min(swing),
+            max=max(swing),
+            min_division = Division[which.min(swing)],
+            max_division = Division[which.max(swing)]) %>%
+  ungroup() %>%
+  mutate(support = ordered(support,
+                           levels=c("none","low","medium","high"),
+                           labels=c("0: no C200 support",
+                                    "1: low C200 support",
+                                    "2: medium C200 support",
+                                    "3: high C200 support"))) %>%
+  select(support,party_group,m,min,min_division,max,max_division)
+
+datatable(tab,
+              caption = "Average, minimum and maximum swings, by party and level of C200 support for IND candidates",
+              extensions = c("Buttons","RowGroup"),
+              options = list(
+                dom="Bt",
+                buttons=c("copy","csv","excel"),
+                searching=FALSE,
+                pageLength=nrow(tab),
+                paging=FALSE,
+                orderFixed=list(list(0,'desc')),
+                rowGroup=list(dataSrc=0),
+                columnDefs=list(
+                  list(className='dt-left',
+                       targets=c(4,6)),
+                  list(targets=0,
+                       visible=FALSE)
+                )
+              ),
+              colnames = c("Avg"="m","Div"="min_division","Div"="max_division"),
+              rownames = FALSE) %>%
+  formatRound(columns=4,digits=0) %>%
+  formatRound(columns = c(3,4,6),digits=1)
+
+```
+
+### Statistical tests
+
+```{r}
+library(broom)
+foo <- plotData %>% 
+  filter(party_group %in% c("Coalition","Labor","GRN")) %>%
+  mutate(x = match(support,levels(support))) %>%
+  group_nest(party_group) %>%
+  mutate(m = map(.x=data,~anova(lm(swing ~ support,data=.x)))) %>%
+  mutate(m_lm = map(.x=data,~lm(swing ~ x,data=.x))) %>%
+  mutate(s = map(.x=m,tidy)) %>%
+  mutate(s_lm = map(m_lm,tidy)) %>%
+  ungroup()
+ 
+tab <- foo %>% 
+  unnest(s_lm) %>% 
+  filter(term=="x") %>% 
+  select(party_group,estimate,statistic,p.value) %>%
+  mutate(p.value = ifelse(p.value<.01,
+                          "<.01",
+                          sprintf(p.value,"%3.2f")))
+
+knitr::kable(tab,digit=1,
+      caption="Rate at which swing changes per one point increase in C200 support on four point scale (0-3).")
+```
+
+## Scatterplot of changes in vote shares
+
+```{r levels-changes-2d}
+tmp <- data$fp %>% 
+  filter(party_group %in% c("Coalition","Labor","GRN")) %>%
+  mutate(party_group_2 = fct_collapse(party_group,Labor_plus_GRN=c("Labor","GRN"))) %>%
+  group_by(Division,party_group_2) %>%
+  summarise(per=sum(per),per_historic=sum(per_historic)) %>%
+  ungroup() %>%
+  pivot_wider(id_cols = Division,
+              names_from = party_group_2,
+              values_from = c("per","per_historic")) %>%
+  rename(x=per_historic_Coalition,
+         xend=per_Coalition,
+         y=per_historic_Labor_plus_GRN,
+         yend=per_Labor_plus_GRN) %>%
+  left_join(c200,by="Division") %>%
+  mutate(support = replace_na(support,"none")) %>%
+  left_join(changing_hands,by="Division") %>%
+  mutate(changing_hands = replace_na(changing_hands,FALSE),
+         changing_hands = factor(changing_hands)) %>% 
+    mutate(gy=if_else(support %in% c("high","medium"),0,1),
+           gx=if_else(support %in% c("high","low"),0,1)
+           )
+
+# ggplot(tmp,aes(x=x,xend=xend,y=y,yend=yend,color=changing_hands)) + 
+#   geom_segment(arrow=arrow(length=unit(2,"pt"))) + 
+#   facet_wrap(~support) + 
+#   scale_x_continuous("Coalition, 2019 to 2022 1st preferences",
+#                      minor_breaks = NULL,
+#                      breaks=seq(20,70,by=10)) + 
+#   scale_y_continuous("Labor and Green combined, 2019 to 2022 1st preferences",
+#                      minor_breaks = NULL,
+#                      breaks=seq(20,70,by=10)) +
+#   scale_color_manual("Seat changing hands:",values=c("TRUE"="orange","FALSE"=gray(.75))) +
+#   coord_fixed() +
+#   theme_light()
+
+```
+
+```{r}
+ojs_define(zzz=tmp)
+```
+
+```{ojs}
+d = transpose(zzz)
+//import {Plot} from "@mkfreeman/plot-tooltip"
+xdomain = d3.extent(d.flatMap(d => [d.x, d.xend, d.y, d.yend]))
+```
+
+```{ojs}
+//| label: fig-swing-vector
+//| fig-cap: "Vectors indicate magnitude and direction of swings in House of Representatives elections.  The panels separate divisions by level of C200 support to candidates in the given seat.   Each data point is a House of Representatives division. Orange lines indicate seats changing hands.  Roll over each data point to display division name."
+Plot.plot({
+  grid: true,
+  width: 1000,
+  height: 1000,
+  inset: 0,
+  
+  style: {
+    fontSize: "14px"
+  },
+  
+  x: {
+    label: "Coalition 1st preferences (%) →",
+    labelOffset: 36,
+    domain: xdomain,
+    ticks: [20, 30, 40, 50, 60, 70]
+  },
+  
+  y: {
+    label: "↑ ALP & Greens 1st preferences (%)",
+    domain: xdomain,
+    ticks: [20, 30, 40, 50, 60, 70]
+  },
+  
+  fx: {
+    label: null,
+    ticks: null
+  },
+  
+  fy: {
+    label: null,
+    ticks: null
+  },
+
+  facet: {
+    data: d,
+    x: "gx",
+    y: "gy",
+    label: null,
+    width: 400,
+    height: 400,
+    marginTop: 40,
+    marginLeft: 24,
+    marginRight: 24,
+    marginBottom: 40
+    },
+  
+  marks: [
+    Plot.frame({stroke: "#333"}),
+    
+    Plot.arrow(d,
+    {
+      x1: "x", 
+      x2: "xend",
+      y1: "y", 
+      y2: "yend",
+      bend: false,
+      stroke: (d) => d.changing_hands=="TRUE" ? "orange" : "#666",
+      title: (d) => `${d.Division} \n 2022 winner: ${d.leading_party} \n 2019 winner: ${d.inc_party}`
+    }
+    ),
+    
+    Plot.text(d,
+      Plot.selectFirst(
+      {
+        x: xdomain[1],
+        y: xdomain[1],
+        dx: -4,
+        dy: 8,
+        textAnchor: "end",
+        text: (d) => "C200 support for IND: " + d.support
+      }
+      )
+    )
+  ],
+  
+  tooltip: {
+    fill: "red"
+  }  
+  
+})
+```
+
+
+```{r,eval=FALSE}
+tmp <- data$fp %>% 
+  filter(party_group %in% c("Coalition","Labor","GRN")) %>%
+  mutate(party_group_2 = fct_collapse(party_group,Labor_plus_GRN=c("Labor","GRN"))) %>%
+  group_by(Division,party_group_2) %>%
+  summarise(per=sum(per),per_historic=sum(per_historic)) %>%
+  ungroup() %>%
+  mutate(swing = per-per_historic) %>%
+  ungroup() %>%
+  pivot_wider(id_cols="Division",names_from = party_group_2,values_from = swing) %>%
+  left_join(c200,by="Division") %>%
+  mutate(support = replace_na(support,"none")) %>%
+  left_join(changing_hands,by="Division") %>%
+  mutate(changing_hands = replace_na(changing_hands,FALSE),
+         changing_hands = factor(changing_hands))
+
+ggplot(tmp,
+       aes(x=Coalition,y=Labor_plus_GRN,
+           color=changing_hands,alpha=changing_hands,
+           shape=changing_hands)
+       ) + 
+  geom_vline(xintercept = 0) + 
+  geom_hline(yintercept = 0) + 
+  geom_point() + 
+  facet_wrap(~support) + 
+  scale_x_continuous("Swing, Coalition",minor_breaks = NULL) + 
+  scale_y_continuous("Swing, Labor and Green combined",minor_breaks = NULL) +
+  scale_shape_manual("Seat changing hands:",values=c("TRUE"=16,"FALSE"=1)) +
+  scale_alpha_manual("Seat changing hands:",values=c("TRUE"=1,"FALSE"=.25)) + 
+  scale_color_manual("Seat changing hands:",values=c("TRUE"="orange","FALSE"=gray(.25))) +
+  coord_equal() +
+  theme_minimal()
+
+```
+
+## Two-candidate preferred swing for Coalition candidates
+
+```{r}
+coalition_tcp_count <- data$tcp %>% 
+  mutate(candidate_id=as.integer(candidate_id)) %>%
+  left_join(candidates,
+            by=c("Division","candidate_id")) %>% 
+  join_parties() %>%
+  group_by(Division) %>%
+  summarise(ok=any(party_group=="Coalition")) %>% 
+  ungroup() %>% 
+  filter(ok)
+
+
+load(here("data/2019/aec_historic_2022.RData"))
+tcp_historic <- 
+  aec_historic_2022 %>% 
+  filter(type=="tcp") %>%
+   mutate(party_group = case_when(
+    PartyAb == "ALP" ~ "Labor",
+    PartyAb %in% c("LP","LNP","NP","CLP") ~ "Coalition",
+    PartyAb == "GRN" ~ "GRN",
+    PartyAb == "UAPP" ~ "UAP",
+    PartyAb == "ON" ~ "PHON",
+    TRUE ~ "OTH")
+   ) %>%
+  rename(per_historic=p,
+         Division=DivisionName)
+
+plotData <- data$tcp %>% 
+  mutate(candidate_id=as.integer(candidate_id)) %>%
+  join_parties() %>%
+  semi_join(coalition_tcp_count,by="Division") %>%
+  left_join(c200 %>% select(Division,support),
+            by="Division") %>%
+  mutate(support = replace_na(support,"none")) %>%
+  left_join(changing_hands,by="Division") %>%
+  mutate(changing_hands = replace_na(changing_hands,FALSE),
+         changing_hands = factor(changing_hands)) %>%
+  filter(party_group=="Coalition") %>%
+  left_join(tcp_historic %>% 
+              select(Division,party_group,per_historic),
+            by=c("Division","party_group")
+            ) %>%
+  mutate(j = case_when(
+    support == "none" ~ 0,
+    support == "low" ~ 1,
+    support == "medium" ~ 2,
+    support == "high" ~ 3)
+  ) %>%
+  arrange(desc(j),desc(per_historic)) %>%
+  select(j,Division,per,per_historic,
+         name,support,leading_party,inc_party,changing_hands)
+
+ojs_define(zzz2=plotData)
+```
+
+Two-candidate preferred (TCP) counts for Coalition candidates are available in `r length(unique(plotData$Division))` divisions.  The graph below shows changes in Coalition TCP 2019 to 2022 by level of C200 support for IND candidates in those divisions.   Again, color indicates seats changing hands.
+
+
+```{ojs}
+zzz3 = transpose(zzz2)
+xdomain_all = d3.extent(zzz3.flatMap(d => [d.per, d.per_historic]))
+
+/* viewof theData = Inputs.select(d3.group(zzz3, d => d.support), {label: "C200 level of support:"}) */
+
+/* theData = transpose(zzz2)
+    .slice()
+    .sort(a => d3.descending(a.per_historic)) */
+    
+function dotplot(j){
+  let theData = zzz3.filter(d => d.support==j)
+  let divDomain = theData.map(d => d.Division)
+  
+  let p = Plot.plot({
+    height: theData.length * 15 + 70,
+    marginLeft: 90,
+    marginTop: 30,
+    marginBottom: 40,
+    
+    y: {
+      label: null,
+      domain: divDomain, 
+      grid: true
+    },
+    
+    x: {
+      domain: xdomain_all,
+      label: "Coalition TCP (%), 2019 & 2022 →" 
+    },
+  
+  marks: [
+  
+
+    Plot.link(divDomain,
+    {
+      x: 50,
+      y1: divDomain.slice(0),
+      y2: divDomain.slice(divDomain.length-1)
+    }),
+    
+    Plot.text(theData,
+      Plot.selectFirst(
+      {
+        x: xdomain_all[0],
+        y: divDomain.slice(0),
+        dx: -70,
+        dy: -18,
+        fontSize: 14,
+        textAnchor: "start",
+        text: (g) => "C200 support for IND: " + g.support
+      }
+      )
+    ),
+    
+    Plot.arrow(theData,
+    {
+      x1: "per_historic",
+      x2: "per",
+      y: "Division",
+      headLength: 4,
+      insetStart: 2,
+      stroke: (g) => g.changing_hands=="TRUE" ? "orange" : "#666",
+      strokeWidth: 2,
+      title: (g) => `${g.Division}\n2022: ${d3.format(".1f")(g.per)}%; Winner: ${g.leading_party} \n 2019: ${d3.format(".1f")(g.per_historic)}%; Winner: ${g.inc_party}`
+    }
+    ),
+    
+  Plot.dot(theData,
+    {
+      x: "per_historic",
+      y: "Division",
+      r: 2,
+      fill: "#666"
+    }),
+    
+  ]
+  })
+  
+  return(p)
+}
+```
+
+
+```{ojs}
+dotplot("high")
+```
+
+```{ojs}
+dotplot("medium")
+```
+
+```{ojs}
+dotplot("low")
+```
+
+```{ojs}
+dotplot("none")
+```
+
+
+### Swing data, all divisions, grouped by level of C200 support
+
+<br>
+
+```{r swing-data-tab,eval=FALSE}
+tabData <- plotData %>% 
+  filter(party_group %in% c("Coalition","Labor","GRN")) %>%
+  pivot_wider(id_cols=c("support","Division"),
+              names_from = party_group,
+              values_from = swing) %>%
+  mutate(support = ordered(support,
+                           levels=c("none","low","medium","high"),
+                           labels=c("0 - none C200 support",
+                                    "1 - low C200 support",
+                                    "2 - medium C200 support",
+                                    "3 - high C200 support"))) %>%
+  left_join(changing_hands %>%
+              select(changing_hands,leading_party,inc_party,Division),
+            by="Division") %>%
+  mutate(changing_hands = replace_na(changing_hands,FALSE),
+         changing_hands = factor(changing_hands)) %>%
+  arrange(desc(support))
+
+datatable(
+  tabData,
+  rownames = FALSE,
+  extensions = c("Buttons","RowGroup"),
+  options = list(
+    dom="Bt",
+    buttons=c("copy","csv","excel"),
+    paging=FALSE,
+    pageLength=nrow(tabData),
+    orderFixed=list(list(0,'desc')),
+    rowGroup=list(dataSrc=0),
+    columnDefs=list(list(targets=0,visible=FALSE))
+  )
+) %>%
+  formatRound(columns = 3:5,digits = 1)
+
+```

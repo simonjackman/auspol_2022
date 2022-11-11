@@ -1,0 +1,2027 @@
+---
+title: "Candidate and party performance across forms of voting"
+author: 
+  - Simon Jackman
+date: now
+date-format: "h:mmA D MMMM YYYY"
+format:
+  html:
+    theme:
+      - cosmo
+      - custom.scss
+    mainfont: Avenir
+    fontsize: 16px
+    toc: true
+    fig-width: 8
+    fig-height: 6
+    echo: false
+    code-tools: true
+    smooth-scroll: true
+    self-contained: true
+tbl-cap-location: bottom    
+crossref:
+  tbl-title: Table
+knitr: 
+  opts_knit: 
+    echo: FALSE
+    warnings: FALSE
+    message: FALSE
+execute:
+  keep-md: true
+  warning: false
+  error: false
+  echo: false
+---
+
+```{=html}
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+```
+```{=html}
+<script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.5"></script>
+```
+
+```{r setup}
+library(tidyverse)
+library(here)
+library(fst)
+library(DT)
+library(htmltools)
+library(knitr)
+library(kableExtra)
+options(knitr.kable.NA=' ')
+source(here("code/goLive.R"))
+source(here("code/parse_functions.R"))
+load(here(paste("data",year,"preload/pre_load.RData",sep="/")))
+load(here(paste("data",year,"working/latest.RData",sep="/")))
+
+c200 <- tribble(
+  ~Division,     ~candidate_id, ~support, ~elected,
+  "Boothby",     37700, "low",  "no",
+  "Bradfield",   36047, "medium", "no",
+  "Calare",      35951, "low", "no",
+  "Casey",       36746, "low", "no",
+  "Clark",       33553, "low", "yes",
+  "Cowper",      36245, "high", "no",
+  "Curtin",      36589, "high", "yes",
+  "Flinders",    37210, "low", "no",
+  "Goldstein",   36074, "high", "yes",
+  "Grey",        37725, "low", "no",
+  "Hughes",      36104, "medium", "no",
+  "Indi",        32086, "low", "yes",
+  "Kooyong",     36081, "high", "yes",
+  "Mackellar",   37450, "high", "yes",
+  "Mayo",        37710, "medium", "yes",
+  "North Sydney", 37452, "high", "yes",
+  "Page",       37568,  "medium", "no",
+  "Wannon",     33601,  "low", "no",
+  "Warringah",  32467,  "medium", "yes",
+  "Wentworth",   37451, "high", "yes"
+  ) %>%
+  left_join(candidates %>% 
+              select(Division,candidate_id,name,affiliation_abb,independent),
+            by=c("Division","candidate_id")
+  )
+
+lastUpdated_String <- str_squish(
+  paste0(
+    str_replace(
+      strftime(max(data$fp_type$timestamp),
+               "%l:%m%p %A %e %B %Y"),
+      pattern="  ",
+      replacement=" "),
+    "."
+  )
+)
+```
+
+# Summary {.highlights}
+
+- 2022 saw less than half of the electorate turn out to vote in-person and on Election Day.
+
+- Pre-polling and postal voting continued to become more prevalent methods of voting in 2022, accounting for 33% and 14% of 2022 turnout, respectively (<a href="#tbl-national">Table 1</a>; @fig-vote-type-ojs).
+
+- Coalition voters are more likely to use pre-polling or postal votes. In 2022, Coalition House candidates did 3 percentage points better in pre-polls than in other forms of voting, and 6 percentage points better in postal votes than in other forms of voting (<a href="#tab-breakdown">Table 2</a>; <a href="#tbl-vote-shares-by-type-2022-perf">Table 3</a>).
+
+-   The **six C200-supported candidates successfully elected to the House of Representatives typically *under-performed* in postal votes relative to other forms of voting** (@fig-postal-perf).  In part, this is due to the demographic and political dispositions of electors availing themselves of postal voting.
+
+-   But **incumbent independents (e.g., Wilkie, Steggall, Haines, Sharkie) did just as well *or better* among postal votes** relative to other forms of voting.
+
+-   Why? Does incumbency confer advantages on candidates with respect to shifting their voters to postal voting? If so, what are those advantages?   Or alternatively, are incumbents doing a better job attracting the votes of electors committed to voting by mail?
+
+# Recommendations {.highlights}
+
+-   [Section 90B of the *Commonwealth Electoral Act*](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088289) entitles successful House of Representatives candidates to a version of the electoral roll with postal voting information appended for each voter; in particular see section 90B(10). Analysis of that information will be vital in helping answer the questions posed above, and to ensure that postal voting etc are not points of vulnerability for Independent candidates in future elections.
+
+- Pooling this information from the AEC across multiple divisions would strengthen the analytical power and practical utility of this proposed analysis.   
+
+- Given restrictions on access to the electoral roll, legal advice can inform if and how this combined analysis can be undertaken. 
+
+# Vote types in Australian federal elections
+
+The AEC classifies votes as follows:
+
+-   **ordinary votes**: cast in person at polling places, typically in the elector's division of enrolment or at designated voting centres in capital cities and provincial centres adjoining that division. In 2019 83.2% of electors turned out to vote this way. The AEC includes **pre-poll** votes in this group, votes cast in person at pre-polling voting centres (PPVCs) or AEC divisional offices.
+
+There are four types of **declaration votes**, where the voter signs a declaration instead of being marked off against the roll:
+
+-   **postal votes**: electors may request a mail ballot from the AEC and return it through the post. This is the most prevalent form of declaration voting, and form the vast bulk of the ballots counted after election night, as many postal votes have been returned to the AEC before Election Day.
+
+-   **absent votes**: votes cast on Election Day, in person at a polling place, by electors outside of their division of enrolment (but still within their state or territory).
+
+-   **declaration pre-poll votes**: pre-poll ballots cast away from the elector's division of enrolment.
+
+-   **provisional votes**: ballots cast subject to AEC verification of the voter's claim to be enrolled and entitled to vote in a particular division (typically used in cases of errors in names or addresses on the roll) or when the voter is registered as a silent elector.
+
+# Change in prevalence of voting types, 2019 to 2022
+
+```{r}
+tmp <- data$totals_pp %>%
+  left_join(pollingPlaces,by=c("Division","pp_id")) %>%
+  mutate(Type = if_else(grepl(pattern="PPVC",pp_name),
+                        "PPVC",
+                        "PollingPlace")
+         ) %>%
+  group_by(Division,Type) %>%
+  summarise(v=sum(v),
+            v_historic=sum(v_historic)) %>%
+  ungroup() 
+
+tmp <- bind_rows(
+  data$totals %>% 
+    semi_join(
+      contest %>% 
+        filter(!is.na(contest_id)),
+      by="Division"),
+  tmp) %>%
+  filter(Type!="Ordinary") %>%
+  group_by(Division) %>%
+  mutate(per = v/sum(v)*100,
+         per_historic = v_historic/sum(v_historic)*100) %>%
+  ungroup() 
+
+tmp <- bind_rows(
+  tmp,
+  tmp %>%
+    group_by(Type) %>%
+    summarise(v=sum(v),
+              v_historic=sum(v_historic)) %>%
+    ungroup() %>%
+    mutate(Division="National",
+           per=v/sum(v)*100,
+           per_historic=v_historic/sum(v_historic)*100)
+)
+
+load(here("data/2019/v2019_type_national.RData"))
+tab <- left_join(
+  v2019_type_national %>%
+    mutate(Type = str_remove(Type,pattern="Votes$")) %>%
+    select(Type,per2019=per),
+  tmp %>% 
+    filter(Division=="National") %>%
+    select(Type,per2022=per),
+  by="Type"
+) %>%
+  mutate(Type_lab = if_else(Type=="PollingPlace","Polling Place on Election Day",Type),
+         Type_lab = if_else(Type=="PPVC","Pre-poll voting center (PPVC)",Type_lab),
+         Type_lab = if_else(Type=="PrePoll","Declaration pre-poll",Type_lab),
+         decvote = if_else(Type %in% c("PollingPlace","PPVC"),"Ordinary Votes","Declaration Votes"))
+           
+## if some Types missing for current election
+## use historical rate and re-normalise
+##plotData <- tmp %>%
+##  group_by(Division) %>%
+##  mutate(
+##    p_star = if_else(per==0,per_historic,NA_real_),
+##    p_star_sum = sum(p_star,na.rm = TRUE),
+##    p_star = if_else(per!=0,per*(100-p_star_sum)/100,p_star)
+##  ) %>%
+##  ungroup()
+```
+
+<a href="#tbl-national">Table 1</a> shows the change in rates of the three most prevalent voting types between the 2019 and 2022 federal elections at the divisional level. Postal voting and pre-polling continued to surge in popularity in 2022. Postals and PPVCs have become more prevalent while in-person, Election Day voting has become less popular, accounting for less than 46% of 2022 turnout.
+
+```{r}
+#| tbl-cap: !expr paste("this caption",lastUpdated_String,"{#tbl-eek}")
+datatable(tab %>%
+            select(decvote,Type_lab,per2019,per2022),
+          colnames=c("decvote","Vote Type","2019","2022"),
+          rownames = FALSE,
+          elementId="tbl-national",
+          caption = paste(
+            "Table 1: Percentage of votes cast by indicated method, including informal ballots.",
+            "2019 data from AEC website.",
+            "2022 AEC data last updated",lastUpdated_String),
+          extensions = c("Buttons","RowGroup"),
+          class=c("display","row_grouped"),
+          options=list(dom="Bt",
+                       searching=FALSE,
+                       paging=FALSE,
+                       ordering=FALSE,
+                       rowGroup=list(dataSrc=0),
+                       columnDefs=list(
+                        list(targets=0,visible=FALSE)
+                       ),
+                       buttons=c("copy","csv","excel"))) %>%
+  formatRound(columns=~per2022+per2019,digits=1)
+```
+
+<br>
+
+```{r}
+tmp <- tmp %>%
+  filter(Type %in% c("PollingPlace","PPVC","Postal")) %>%
+  filter(Division!="National") %>%
+  semi_join(pollingPlaces,by="Division") %>%
+  mutate(source="data") %>%
+  mutate(c200 = as.character(Division %in% c200$Division)) %>% 
+  arrange(Type,c200,per_historic)
+
+load(here("data/2019/aec_historic_2022.RData"))
+tmp <- tmp %>% 
+  left_join(aec_historic_2022 %>%
+              select(Division=DivisionName,State) %>%
+              distinct(),
+            by="Division")
+
+library(mgcv)
+m <- tmp %>%
+  group_nest(Type,c200) %>%
+  mutate(m = map(.x=data,~gam(per ~ s(per_historic),data=.x))) %>%
+  mutate(
+    x = map2(.x=data,
+             .y=m,
+             ~modelr::data_grid(data=.x,
+                                .model=.y,
+                                per_historic=modelr::seq_range(per_historic,nrow(.x))
+             )
+    )
+  ) %>%
+  mutate(yhat = map2(.x=m,.y=x,~predict(.x,.y))) %>%
+  ungroup() %>%
+  unnest(c(x,yhat)) %>%
+  select(Type,c200,per_historic,per=yhat) %>%
+  arrange(Type,c200,per_historic) %>%
+  mutate(source="predict")
+
+
+  
+library(quarto)
+ojs_define(vtype = tmp)
+ojs_define(yhat = m)
+```
+
+@fig-vote-type-ojs displays the rates at which voters use different methods of voting by division, comparing 2019 rates (horizontal axis) to 2022 rates (vertical axis). Divisions where Independent candidates were supported by C200 are shown in the lower row of @fig-vote-type-ojs.
+
+```{ojs}
+vtype_data = transpose(vtype)
+xdomain = d3.extent(vtype_data.flatMap(d => [d.per_historic, d.per]))
+yhat_data = transpose(yhat)
+//import {Plot} from "@mkfreeman/plot-tooltip"
+//Plot = require("@observablehq/plot@0.5")
+//import { * } from "@observablehq/plot"
+```
+
+```{ojs,eval=FALSE}
+addTooltips = (chart, hover_styles = { fill: "blue", opacity: 0.5 }) => {
+  let styles = hover_styles;
+  const line_styles = {
+    stroke: "blue",
+    "stroke-width": 3
+  };
+  // Workaround if it's in a figure
+  const type = d3.select(chart).node().tagName;
+  let wrapper =
+    type === "FIGURE" ? d3.select(chart).select("svg") : d3.select(chart);
+
+  // Workaround if there's a legend....
+  const numSvgs = d3.select(chart).selectAll("svg").size();
+  if (numSvgs === 2)
+    wrapper = d3
+      .select(chart)
+      .selectAll("svg")
+      .filter((d, i) => i === 1);
+  wrapper.style("overflow", "visible"); // to avoid clipping at the edges
+
+  // Set pointer events to visibleStroke if the fill is none (e.g., if its a line)
+  wrapper.selectAll("path").each(function (data, index, nodes) {
+    // For line charts, set the pointer events to be visible stroke
+    if (
+      d3.select(this).attr("fill") === null ||
+      d3.select(this).attr("fill") === "none"
+    ) {
+      d3.select(this).style("pointer-events", "visibleStroke");
+      styles = _.isEqual(hover_styles, { fill: "blue", opacity: 0.5 })
+        ? line_styles
+        : hover_styles;
+    }
+  });
+
+  const tip = wrapper
+    .selectAll(".hover-tip")
+    .data([""])
+    .join("g")
+    .attr("class", "hover")
+    .style("pointer-events", "none")
+    .style("text-anchor", "middle");
+
+  // Add a unique id to the chart for styling
+  const id = id_generator();
+
+  // Add the event listeners
+  d3.select(chart)
+    .classed(id, true) // using a class selector so that it doesn't overwrite the ID
+    .selectAll("title")
+    .each(function () {
+      // Get the text out of the title, set it as an attribute on the parent, and remove it
+      const title = d3.select(this); // title element that we want to remove
+      const parent = d3.select(this.parentNode); // visual mark on the screen
+      const t = title.text();
+      if (t) {
+        parent.attr("__title", t).classed("has-title", true);
+        title.remove();
+      }
+      // Mouse events
+      parent
+        .on("mousemove", function (event) {
+          const text = d3.select(this).attr("__title");
+          const pointer = d3.pointer(event, wrapper.node());
+          if (text) tip.call(hover, pointer, text.split("\n"));
+          else tip.selectAll("*").remove();
+
+          // Raise it
+          d3.select(this).raise();
+          // Keep within the parent horizontally
+          const tipSize = tip.node().getBBox();
+          if (pointer[0] + tipSize.x < 0)
+            tip.attr(
+              "transform",
+              `translate(${tipSize.width / 2}, ${pointer[1] + 7})`
+            );
+          else if (pointer[0] + tipSize.width / 2 > wrapper.attr("width"))
+            tip.attr(
+              "transform",
+              `translate(${wrapper.attr("width") - tipSize.width / 2}, ${
+                pointer[1] + 7
+              })`
+            );
+        })
+        .on("mouseout", function (event) {
+          tip.selectAll("*").remove();
+          // Lower it!
+          d3.select(this).lower();
+        });
+    });
+
+  // Remove the tip if you tap on the wrapper (for mobile)
+  wrapper.on("touchstart", () => tip.selectAll("*").remove());
+  // Add styles
+  const style_string = Object.keys(styles)
+    .map((d) => {
+      return `${d}:${styles[d]};`;
+    })
+    .join("");
+
+  // Define the styles
+  const style = html`<style>
+      .${id} .has-title {
+       cursor: pointer; 
+       pointer-events: all;
+      }
+      .${id} .has-title:hover {
+        ${style_string}
+    }
+    </style>`;
+  chart.appendChild(style);
+  return chart;
+}
+
+// Function to position the tooltip
+hover = (tip, pos, text) => {
+  const side_padding = 10;
+  const vertical_padding = 2;
+  const vertical_offset = 24;
+
+  // Empty it out
+  tip.selectAll("*").remove();
+
+  // Append the text
+  tip
+    .style("text-anchor", "middle")
+    .style("pointer-events", "none")
+    .attr("transform", `translate(${pos[0]}, ${pos[1] - 6})`)
+    .selectAll("text")
+    .data(text)
+    .join("text")
+    .style("dominant-baseline", "ideographic")
+    .text((d) => d)
+    .attr("y", (d, i) => (i - (text.length - 1)) * 18 - vertical_offset)
+    .style("font-weight", (d, i) => (i === 0 ? "bold" : "normal"));
+
+  const bbox = tip.node().getBBox();
+
+  // Add a rectangle (as background)
+  tip
+    .append("rect")
+    .attr("y", bbox.y - vertical_padding)
+    .attr("x", bbox.x - side_padding)
+    .attr("width", bbox.width + side_padding * 2)
+    .attr("height", bbox.height + vertical_padding * 2)
+    .style("fill", "white")
+    .style("stroke", "#eee")
+    .lower();
+    
+  tip
+    .append("line")
+    .attr("x1",bbox.x + bbox.width/2)
+    .attr("x2",bbox.x + bbox.width/2)
+    .attr("y1",bbox.y + vertical_padding)
+    .attr("y2",this.y)
+    .style("stroke","#eee")
+    .lower();
+}
+
+// To generate a unique ID for each chart so that they styles only apply to that chart
+id_generator = () => {
+  var S4 = function () {
+    return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
+  };
+  return "a" + S4() + S4();
+}
+
+Plot = tooltipPlugin(await require("@observablehq/plot"))
+
+tooltipPlugin = (Plot) => {
+  const { plot } = Plot;
+  Plot.plot = ({ tooltip, ...options }) => addTooltips(plot(options), tooltip);
+  return Plot;
+}
+```
+
+
+```{ojs}
+//| label: fig-vote-type-ojs
+//| fig-cap: "Postal and PPVC voting surged in 2022, and in-person, Election Day voting fell to less than 50% of 2022 turnout.  Each column of plots corresponds to a form of voting; the two rows separate divisions by whether C200 provided support.   Each data point is a House of Representatives division; percentages are of method of voting (including informal ballots).  Orange lines indicate trends.  Roll over each data point to display division name."
+Plot.plot({
+  grid: false,
+  width: 1020,
+  height: 680,
+  insetTop: 18,
+  
+  style: {
+    fontSize: "16px"
+  },
+  
+  x: {
+    label: "2019 Percentage →",
+    labelOffset: 42 
+  },
+  
+  y: {
+    label: "↑ 2022 Percentage"
+  },
+
+  facet: {
+    data: vtype_data,
+    x: "Type",
+    y: "c200",
+    marginTop: 60,
+    marginLeft: 24,
+    marginRight: 24,
+    marginBottom: 40
+    },
+    
+  fx: {
+    padding: 0.1,
+    labelOffset: 48
+  },
+  
+  fy: {
+    axis: 'left',
+    labelAnchor: 'center',
+    label: 'C200 supported',
+    labelOffset: 14
+  },
+  
+  marks: [
+    Plot.link([1],
+      {x1: 0, x2: xdomain[1], y1: 0, y2: xdomain[1]}
+      ),
+      
+   Plot.link([0.7, 0.8, 0.9], {
+      x1: 0,
+      y1: 0,
+      x2: xdomain[1],
+      y2: k => xdomain[1]*k,
+      strokeOpacity: 0.2
+    }),
+    
+    Plot.text([0.7, 0.8, 0.9, 1.0], {
+      x: xdomain[1],
+      y: k => xdomain[1]*k,
+      text: d => d === 1 ? "Equal" : d3.format("+.0%")(d - 1),
+      textAnchor: "start",
+      fontSize: "11px",
+      dx: 6      
+    }),
+    
+    Plot.link([0.1, 0.25, 0.5], {
+      x1: 0,
+      y1: 0,
+      x2: k => xdomain[1]/(1+k),
+      y2: k => xdomain[1],
+      strokeOpacity: 0.2
+    }),
+    
+    Plot.text([0.1, 0.25, 0.5], {
+      x: k => xdomain[1]/(1+k),
+      y: k => xdomain[1],
+      text: d => d === 1 ? "Equal" : d3.format("+.0%")(d),
+      textAnchor: "middle",
+      fontSize: "11px",
+      dy: -6      
+    }),
+    
+    Plot.dot(vtype_data,
+    { x: "per_historic", 
+      y: "per" ,
+      title: (d) => `${d.Division} (${d.State}) \n 2022: ${d3.format(".1f")(d.per)} \n 2019: ${d3.format(".1f")(d.per_historic)}`,
+      stroke: "#3333337f"
+    }
+    ),
+  
+    Plot.line(yhat_data,
+      { x: "per_historic",
+        y: "per",
+        facet: "include",
+        stroke: "orange",
+        strokeWidth: 3
+      }
+    )
+    
+  ],
+  
+  tooltip: {
+    fill: "red"
+  }  
+  
+})
+```
+
+```{r,eval=FALSE}
+data_for_d3 <- tmp %>% 
+             filter(Type=="PPVC") %>%
+  rename(y0=per_historic,y1=p_star)
+ojs_define(d = data_for_d3)
+```
+
+```{r,eval=FALSE}
+library(r2d3)
+options(r2d3.shadow = FALSE)
+r2d3(
+  data=data_for_d3 %>%
+    select(Division,y0,y1) %>%
+    mutate(indx=1:n()) %>%
+    mutate(c200 = Division %in% c200$Division) %>%
+    as.data.frame() %>%
+    jsonlite::toJSON(dataframe="rows"),
+  width = 800,
+  height = 900,
+  script=here("js/parallel_coord.js")
+  )
+```
+
+# Differences in vote support across voting type
+
+Conventionally, (a) major parties outperform minor parties and independents on postals; (b) the Coalition generally outperforms Labor on postals, but this out-performance is less pronounced and even reversed in other forms of voting.
+
+The reasons for this are straightforward:
+
+-   major parties have the organisational resources to make use of the AEC's data on who votes by post etc, to send out applications for postal ballots, to track changes of addresses given their access to to the roll
+
+-   older, wealthier voters make use of postal voting, both for convenience and because they have more time and resources to apply for the ballot, complete it and mail it back. This segment of the electorate skews towards the Coalition.
+
+These patterns are evident in differences in party performance across voting types in the 2022 election, using figures available at this stage of the count, as shown in the following two tables. <a href="#tab-breakdown">Table 2</a> shows first-preference, House of Representatives percentages for each party in 2022 by vote type; <a href="#tbl-vote-shares-by-type-2022-perf">Table 3</a> presents the same data but with each party's vote share by vote type expressed *relative* to that party's performance in other vote types.
+
+```{r}
+#| tbl-cap: !expr paste("Vote shares by vote type, 2022 House of Representatives election.", "AEC data last updated", lastUpdated_String, "{#tbl-vote-shares-by-type-2022}")
+
+theDivisions <- contest %>% filter(!is.na(contest_id))
+
+tmp <- data$fp_pp %>% 
+  left_join(pollingPlaces,by=c("Division","pp_id")) %>%
+  join_parties() %>%
+  mutate(Type = if_else(grepl(pattern="PPVC",pp_name),
+                        "PPVC",
+                        "PollingPlace")) %>% 
+  group_by(Type,party_group) %>% 
+  summarise(v=sum(votes)) %>% 
+  ungroup() %>%
+  bind_rows(data$fp_type %>%
+              filter(Type!="Ordinary") %>%
+              group_by(Type,party_group) %>%
+              summarise(v=sum(v)) %>%
+              ungroup())
+
+tmp_informal <- data$informal_pp %>%
+  semi_join(theDivisions,by="Division") %>%
+  left_join(pollingPlaces,by=c("Division","pp_id")) %>%
+  mutate(Type = if_else(grepl(pattern="PPVC",pp_name),
+                        "PPVC",
+                        "PollingPlace")) %>% 
+  group_by(Type,formality) %>%
+  summarise(n = sum(n)) %>%
+  ungroup() %>%
+  select(Type,formality,n) %>%
+  bind_rows(
+    data$informality %>%
+      semi_join(theDivisions,by="Division") %>%
+      filter(Type!="All" & Type!="Ordinary") %>%
+      group_by(Type,formality) %>%
+      summarise(n = sum(n)) %>%
+      ungroup() %>%
+      select(Type,formality,n)
+  ) 
+  
+tab_foot <- data$totals_pp %>%
+  semi_join(theDivisions,by="Division") %>%
+  left_join(pollingPlaces,by=c("Division","pp_id")) %>%
+  mutate(Type = if_else(grepl(pattern="PPVC",pp_name),
+                        "PPVC",
+                        "PollingPlace")) %>% 
+  group_by(Type) %>%
+  summarise(v=sum(v)) %>%
+  ungroup() %>%
+  bind_rows(data$totals %>%
+              semi_join(theDivisions,by="Division") %>%
+              filter(Type!="Ordinary") %>%
+              group_by(Type) %>% 
+              summarise(v=sum(v)) %>% 
+              ungroup()
+  ) %>%
+  mutate(p = v/sum(v)*100) %>%
+  mutate(party_group="Prevalence of vote type:") %>%
+  pivot_wider(id_cols=party_group,names_from=Type,values_from = p) %>%
+  mutate(Total = NA_real_)
+
+tab_all_types <- bind_rows(
+  data$fp %>% 
+    group_by(party_group) %>%
+    summarise(v=sum(v)) %>%
+    ungroup() %>%
+    mutate(p=v/sum(v)*100) %>% 
+    rename(Total=p),
+  data$informality %>%
+    semi_join(theDivisions,by="Division") %>%
+    filter(Type=="All") %>%
+    group_by(formality) %>%
+    summarise(n=sum(n)) %>%
+    ungroup() %>%
+    mutate(p=n/sum(n)*100) %>%
+    filter(formality=="Informal") %>%
+    rename(party_group=formality,Total=p,v=n)
+)
+  
+tab_body <- bind_rows(
+  tmp %>%
+    group_by(Type) %>%
+    mutate(p=v/sum(v)*100) %>%
+    ungroup() %>%
+    pivot_wider(id_cols=party_group,names_from=Type,values_from = p),
+  
+  tmp_informal %>%
+    group_by(Type) %>%
+    mutate(p=n/sum(n)*100) %>%
+    ungroup() %>%
+    filter(formality=="Informal") %>%
+    rename(party_group=formality) %>%
+    pivot_wider(id_cols=party_group,names_from=Type,values_from = p)
+)
+
+
+tab <- bind_rows(
+  left_join(
+    tab_body,
+    tab_all_types %>% 
+      select(-v),
+    by="party_group"),
+  tab_foot)
+
+customContainer <- htmltools::withTags(
+  table(
+    class = 'display',
+    thead(
+      tr(
+        th(rowspan = 2, style="vertical-align: bottom;", 'Party'),
+        
+        th(colspan = 2, 
+           style=css(
+             border.bottom="hidden",
+             text.align="center", 
+             padding.left="3px",
+             padding.right="3px",
+             padding.bottom="0"
+           ),
+           div(
+             style=css(
+               border.bottom="1px solid #ddd",
+               padding.bottom="5px"),
+             'Ordinary Votes'
+           )
+        ),
+        
+        th(colspan = 4, 
+           style=css(border.bottom="hidden",
+                     text.align="center", 
+                     padding.left="3px",
+                     padding.right="3px",
+                     padding.bottom="0"),
+           div(
+             style=css(
+                border.bottom="1px solid #ddd",
+               padding.bottom="5px"),
+           'Declaration Votes')
+           ),
+        
+        th(rowspan = 2, style="vertical-align: bottom;", 'Total')
+        
+        ),
+      
+      tr(
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+          "Polling Place"),
+        
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+          "PPVC"),
+        
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Absent"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Postal"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Pre-poll"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Provisional")
+      )
+      )
+    )
+)
+
+datatable(tab,
+          rownames = FALSE,
+          elementId="tbl-breakdown",
+          container = customContainer,
+          caption = paste(
+            "Table 2: Percentage of House of Representatives first preferences won by party by type.",
+            "2022 AEC data last updated",lastUpdated_String),
+          options=list(
+            dom="Bt",
+            searching=FALSE,
+            paging=FALSE,
+            ordering=FALSE,
+            buttons=c("copy","csv","excel")
+            )
+          ) %>%
+  formatRound(columns=2:8,digits=1) %>%
+  formatStyle("Total",borderLeft="1px solid") %>%
+  formatStyle(
+    names(tab),
+    valueColumns='party_group',
+    borderBottom = styleEqual(
+      levels=c("UAP","Informal","Prevalence of vote type:"),
+      values=c("1px solid black","1px solid black","1px solid black"),
+      default=NULL)
+  )
+  
+
+
+##kable(tab,digits=1,format = "html") %>% 
+##  kableExtra::add_header_above(c(" ","Ordinary Votes"=2,"Declaration Votes"=4," ")) %>%
+##  kableExtra::kable_styling(bootstrap_options = "striped",) %>%
+##  kableExtra::column_spec(ncol(tab),border_left = TRUE) %>%
+##  kableExtra::row_spec(row=7,extra_css = "border-bottom: 1px solid") %>%
+##  kableExtra::row_spec(row=8:9,extra_css = "border-bottom: 2px solid")
+```
+
+```{r}
+#| tbl-cap: "Over and under-performance, by party and form of voting, 2022 House of Representatives election. Positive/negative quantities (in blue/red) mean that candidates of the respective party fare better/worse in that type of vote than in others. {#tbl-vote-shares-by-type-2022-perf}"
+tmp_perf <- bind_cols(
+  tmp,
+  tmp %>%
+    sjmisc::to_dummy(Type,suffix="label")) %>%
+  pivot_longer(cols=starts_with("Type_"),
+               names_to = "j",
+               values_to = "k") %>%
+  mutate(k = ifelse(k==1,"this","others")) %>%
+  arrange(j,desc(k)) %>%
+  group_by(j,k,party_group) %>%
+  summarise(v=sum(v)) %>%
+  ungroup() %>%
+  group_by(j,k) %>%
+  mutate(p=v/sum(v)*100) %>%
+  ungroup() %>%
+  pivot_wider(id_cols=c(j,party_group),names_from = k,values_from = p) %>%
+  mutate(delta = this-others) %>%
+  mutate(j = str_remove(j,pattern="Type_")) %>%
+  pivot_wider(id_cols = party_group,names_from = j,values_from = delta)
+  
+tmp_informal_perf <- bind_cols(
+  tmp_informal,
+  tmp_informal %>%
+    sjmisc::to_dummy(Type,suffix="label")) %>%
+  pivot_longer(cols=starts_with("Type_"),
+               names_to = "j",
+               values_to = "k") %>%
+  mutate(k = ifelse(k==1,"this","others")) %>%
+  arrange(j,desc(k)) %>%
+  group_by(j,k,formality) %>%
+  summarise(n=sum(n)) %>%
+  ungroup() %>%
+  group_by(j,k) %>%
+  mutate(p=n/sum(n)*100) %>%
+  ungroup() %>%
+  pivot_wider(id_cols=c(j,formality),names_from = k,values_from = p) %>%
+  mutate(delta = this-others) %>%
+  mutate(j = str_remove(j,pattern="Type_")) %>%
+  filter(formality=="Informal") %>%
+  pivot_wider(id_cols = formality,names_from = j,values_from = delta) %>%
+  rename(party_group=formality)
+
+tab_perf <- bind_rows(tmp_perf,
+                      tmp_informal_perf,
+                      tab_foot) %>%
+  select(party_group,PollingPlace,PPVC,Absent,Postal,PrePoll,Provisional) %>%
+  mutate(
+    across(where(is.double),
+           ~ifelse(party_group!="Prevalence of vote type:",
+                   paste0(
+                     "<span style='color: ",
+                     ifelse(.x>0,"blue","red"),
+                     ";'>",
+                     ifelse(.x>0,"+"," "),
+                     sprintf(.x,fmt="%2.1f"),
+                     "</span>"
+                   ),
+                   sprintf(.x,fmt="%3.1f")
+           )
+    )
+  )
+
+customContainer <- htmltools::withTags(
+  table(
+    class = 'display',
+    thead(
+      tr(
+        th(rowspan = 2, style="vertical-align: bottom;", 'Party'),
+        
+        th(colspan = 2, 
+           style=css(
+             border.bottom="hidden",
+             text.align="center", 
+             padding.left="3px",
+             padding.right="3px",
+             padding.bottom="0"
+           ),
+           div(
+             style=css(
+               border.bottom="1px solid #ddd",
+               padding.bottom="5px"),
+             'Ordinary Votes'
+           )
+        ),
+        
+        th(colspan = 4, 
+           style=css(border.bottom="hidden",
+                     text.align="center", 
+                     padding.left="3px",
+                     padding.right="3px",
+                     padding.bottom="0"),
+           div(
+             style=css(
+                border.bottom="1px solid #ddd",
+               padding.bottom="5px"),
+           'Declaration Votes')
+           )
+        
+        ),
+      
+      tr(
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+          "Polling Place"),
+        
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+          "PPVC"),
+        
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Absent"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Postal"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Pre-poll"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Provisional")
+      )
+      )
+    )
+)
+
+datatable(tab_perf,
+          rownames = FALSE,
+          escape=FALSE,
+          elementId="tbl-vote-shares-by-type-2022-perf",
+          container = customContainer,
+          caption = paste(
+            "Table 3: Over and under performance across types of voting, 2022 House of Representatives first preferences.",
+            "Positive/negative quantities (in blue/red) mean that candidates of the respective party fare better/worse in that type of vote than in others.",
+            "2022 AEC data last updated",lastUpdated_String),
+          options=list(
+            dom="Bt",
+            searching=FALSE,
+            paging=FALSE,
+            ordering=FALSE,
+            columnDefs=list(
+              list(targets=1:6,
+                   className="dt-body-right")
+            ),
+            buttons=c("copy","csv","excel")
+            )
+          ) %>%
+  formatStyle(
+    names(tab),
+    valueColumns='party_group',
+    borderBottom = styleEqual(
+      levels=c("UAP","Informal","Prevalence of vote type:"),
+      values=c("1px solid black","1px solid black","1px solid black"),
+      default=NULL)
+  )
+
+##kable(tab_perf,digits=1,format = "html",escape=FALSE,align="lrrrrrr") %>% 
+##  kableExtra::add_header_above(c(" ","Ordinary Votes"=2,"Declaration Votes"=4)) %>%
+##  kableExtra::kable_styling(bootstrap_options = c("striped","hover","responsive")) %>%
+##  kableExtra::row_spec(row=7,extra_css = "border-bottom: 1px solid") %>%
+##  kableExtra::row_spec(row=8:9,extra_css = "border-bottom: 2px solid")
+```
+
+These 2022 data are consistent with the patterns observed in previous elections:
+
+-   the Coalition over-performs with postal votes and early voting at PPVCs, and under-performs with in Election Day, in-person voting at polling places.
+
+-   while the Coalition is huge over-performer with respect to postal votes, Labor under-performance is close to zero.
+
+-   Relatively few Coalition voters cast a provisional ballot, with Green and Labor voters more likely to vote this way.
+
+-   The Greens have a disproportionate share of absentee votes, and their voters do better in Election Day, in-person voting at polling places.
+
+-   Votes for Independent candidates are disproportionately cast in-person on Election Day, but are less likely to be cast as postal votes.
+
+
+# Even successful C200-supported candidates lagged in postal votes
+
+@fig-postal-perf disaggregates the data shown in summary form above for postal voting.   The preference for postal voting among Coalition voters --- and in seats held by the Coalition --- is clearly apparent (filled circles in @fig-postal-perf denote seats held by the indicated party going into the 2022 election), with almost all Coalition candidates faring better in postal votes than in other vote types.   
+
+A strong performance is postal votes is hardly a guarantee of electoral success, and indeed, could well be a sign of electoral weakness (e.g., that a party's support is overly concentrated in an older segment of an electorate).   @fig-postal-perf highlights that losing Coalition incumbents in Wentworth, Goldstein, Curtin, Kooyong, Mackellar and North Sydney had strong over-performance among postal votes.
+
+The picture is mixed for Labor candidates, with many Labor incumbents in particular recording small to moderate over-performances among postal votes.   Among postal votes, Green candidates almost always under-perform relative to their performance among other forms of voting, including their sole incumbent going into the 2022 election, Adam Bandt (Melbourne).
+
+```{r}
+tmp_base <- data$fp_pp %>% 
+  left_join(
+    pollingPlaces,
+    by=c("Division","pp_id")
+  ) %>%
+  join_parties() %>%
+  mutate(party_group = if_else(candidate_id==37710,"XEN",party_group)) %>%
+  mutate(Type = if_else(grepl(pattern="PPVC",pp_name),
+                        "PPVC",
+                        "PollingPlace")) %>% 
+  group_by(Division,Type,candidate_id) %>% 
+  summarise(party_group=party_group[1],
+            v=sum(votes),
+            v_historic=sum(v_historic)) %>% 
+  ungroup() %>%
+  bind_rows(
+    data$fp_type %>%
+      filter(Type!="Ordinary") %>%
+      mutate(party_group = if_else(candidate_id==37710,"XEN",party_group)) %>%
+      group_by(Division,Type,candidate_id) %>%
+      summarise(party_group=party_group[1],
+                v=sum(v),
+                v_historic=sum(v_historic)) %>%
+      ungroup()
+  ) 
+
+tmp_level <- tmp_base %>%
+  group_by(Division,Type) %>%
+  mutate(p=v/sum(v)*100,
+         p_historic=v_historic/sum(v_historic)*100) %>%
+  ungroup() 
+
+tmp_prev <- tmp_base %>%
+  group_by(Division,candidate_id) %>%
+  mutate(party_group=party_group[1],
+         p=v/sum(v)*100,
+         p_historic=v_historic/sum(v_historic)*100) %>%
+  ungroup()
+
+tmp_prev_all <- data$totals_pp %>%
+   left_join(
+    pollingPlaces,
+    by=c("Division","pp_id")
+  ) %>%
+  mutate(Type = if_else(grepl(pattern="PPVC",pp_name),
+                        "PPVC",
+                        "PollingPlace")) %>% 
+  group_by(Division,Type) %>% 
+  summarise(v=sum(v),
+            v_historic=sum(v_historic)) %>% 
+  ungroup() %>%
+  bind_rows(
+    data$totals %>%
+      filter(Type!="Ordinary") %>%
+      group_by(Division,Type) %>%
+      summarise(v=sum(v),
+                v_historic=sum(v_historic)) %>%
+      ungroup()
+  ) %>% 
+  group_by(Division,Type) %>%
+  summarise(v=sum(v),
+            v_historic=sum(v_historic)) %>%
+  ungroup() %>%
+  group_by(Division) %>%
+  mutate(p=v/sum(v)*100,
+         p_historic=v_historic/sum(v_historic)*100) %>%
+  ungroup()
+
+tmp_perf <- bind_cols(
+  tmp_base,
+  tmp_base %>%
+    sjmisc::to_dummy(Type,suffix="label")
+  ) %>%
+  pivot_longer(cols=starts_with("Type_"),
+               names_to = "j",
+               values_to = "k") %>%
+  mutate(k = ifelse(k==1,"this","others")) %>%
+  group_by(Division,j,k,candidate_id) %>%
+  summarise(party_group=party_group[1],
+            v=sum(v),
+            v_historic=sum(v_historic)) %>%
+  ungroup() %>%
+  group_by(Division,j,k) %>%
+  mutate(p=v/sum(v)*100,
+         p_historic=v_historic/sum(v_historic)*100) %>%
+  ungroup() %>%
+  pivot_wider(id_cols=c(Division,j,candidate_id,party_group),
+              names_from = k,
+              values_from = c(p,p_historic)) %>%
+  mutate(delta = p_this-p_others,
+         delta_historic = p_historic_this - p_historic_others) %>%
+  mutate(j = str_remove(j,pattern="Type_")) %>%
+  pivot_wider(id_cols = c(Division,candidate_id,party_group),
+              names_from = j,
+              values_from = c(delta,delta_historic))
+
+
+tab <- bind_rows(
+  tmp_level %>%
+    pivot_wider(id_cols=c(Division,candidate_id,party_group),
+                names_from = Type,
+                values_from = p) %>%
+    mutate(j="level"),
+  
+  tmp_perf %>%
+    mutate(j="perf") %>% 
+    select(-contains("_historic_")) %>%
+    rename_with(.fn = ~gsub(pattern="delta_",replacement="",.x),
+                starts_with("delta_")),
+  
+  tmp_prev %>%
+    pivot_wider(id_cols=c(Division,candidate_id,party_group),
+                names_from = Type,
+                values_from = p) %>%
+    mutate(j="prev")
+) 
+
+tmp_prev_all_2 <- tmp_prev_all %>% 
+    pivot_wider(id_cols=c(Division),names_from = Type,values_from = p) %>%
+    mutate(j="prev_all",party_group="IND")
+
+tab_for_later <- tab %>% 
+  group_nest(candidate_id) %>%
+  mutate(d = map(.x=data,
+                 ~bind_rows(.x,
+                            semi_join(tmp_prev_all_2,.x,by="Division")
+                            )
+                 )
+  ) %>%
+  ungroup() %>%
+  unnest(d) %>%
+  select(-data) %>% 
+  left_join(c200 %>%
+              select(Division,support),
+            by="Division") %>%
+  mutate(support = replace_na(support,"none")) %>%
+  mutate(support = ordered(support,levels=c("none","low","medium","high"))) %>%
+  mutate(j = ordered(j,
+                     levels=c("level","perf","prev","prev_all"),
+                     labels=c("IND share of vote by type",
+                              "IND share relative to share from other types",
+                              "Share of IND vote from type",
+                              "Share of all votes in division from type")
+                     )
+         ) %>%
+  arrange(support,Division,party_group,j)
+```
+
+```{r make-zzz-for-plotting-regression}
+zzz <- left_join(
+  tmp_perf %>%
+    pivot_longer(cols=where(is.double),
+                 names_to = "Type",
+                 values_to = "perf") %>%
+    mutate(historic = grepl(pattern="_historic_",Type),
+           Type = str_remove(Type,pattern="^.*_")),
+  
+  tmp_prev_all %>%
+    select(Division,Type,p,p_historic) %>%
+    pivot_longer(cols=c(p,p_historic),names_to = "historic",values_to = "prev") %>%
+    mutate(historic = grepl(pattern="historic",historic)),
+  
+  by=c("Division","Type","historic")
+  
+  ) %>%
+  left_join(
+    candidates %>% 
+      join_parties() %>%
+      group_by(Division) %>%
+      mutate(neh = all(elected_historic!="true"),
+             noinc = all(incumbent!="true"),
+             incumbent_2022 = case_when(
+               elected_historic=="true" ~ TRUE,
+               neh & incumbent=="true" ~ TRUE,
+               neh & noinc & incumbent_notional=="true" ~ TRUE,
+               TRUE ~ FALSE)
+      ) %>%
+      ungroup() %>% 
+      select(Division,candidate_id,party_group,affiliation_abb,
+             incumbent_2022) %>%
+      mutate(historic=FALSE),
+    by=c("Division","party_group","candidate_id","historic")
+  ) %>%
+  left_join(
+    c200 %>%
+      select(Division,support),
+    by="Division") %>%
+  mutate(support = replace_na(support,"none")) %>%
+  mutate(support = ordered(support,levels=c("none","low","medium","high"))) %>%
+  mutate(party_group = if_else(Division=="Mayo" & party_group=="XEN",
+                               "IND",party_group),
+         party_group = if_else(Division=="Kennedy" & affiliation_abb=="KAP",
+                               "IND",party_group)) %>% 
+  mutate(incumbent_2022 = if_else(candidate_id==37710,TRUE,incumbent_2022))
+
+## merge on incumbency from 2019
+load(here("data/2019/Preload/pre_load.RData"))
+candidates_2019 <- candidates
+load(here("data/2022/preload/pre_load.RData"))
+
+zzz <- zzz %>%
+  left_join(
+    candidates_2019 %>% 
+      group_by(Division) %>%
+      mutate(neh = all(elected_historic!="true"),
+             noinc = all(incumbent!="true"),
+             incumbent_2019 = case_when(
+               elected_historic=="true" ~ TRUE,
+               neh & incumbent=="true" ~ TRUE,
+               neh & noinc & incumbent_notional=="true" ~ TRUE,
+               TRUE ~ FALSE)
+      ) %>%
+      ungroup() %>% 
+      filter(incumbent_2019) %>%
+      select(Division,affiliation_abb,incumbent_2019),
+    by=c("Division","affiliation_abb")
+  ) %>%
+  group_by(Division,candidate_id) %>%
+  fill(party_group) %>%
+  fill(incumbent_2019) %>% 
+  fill(incumbent_2022) %>% 
+  ungroup() %>%
+  mutate(incumbent_2019 = replace_na(incumbent_2019,FALSE))
+
+
+zzz <- zzz %>%
+  pivot_wider(id_cols=c("Division","candidate_id","party_group","Type",
+                        "incumbent_2022","incumbent_2019"),
+              names_from = "historic",
+              values_from = c("perf","prev")) %>%
+  rename_with(.fn = ~gsub(pattern="_FALSE",replacement = "",.x),
+              .cols = ends_with("_FALSE")) %>%
+  rename_with(.fn = ~gsub(pattern="_TRUE",replacement="_historic",.x),
+              .cols=ends_with("_TRUE"))
+
+
+## manually get Phelps 2019 perf data for Wentworth historic
+load(here("data/2019/v2019_type.RData"))
+shim <- v2019_type_perf %>%
+  filter(candidate_id==32085) %>% 
+  pivot_longer(cols = c("Absent","PollingPlace","Postal","PPVC","PrePoll","Provisional"),
+               names_to = "Type",
+               values_to = "perf_historic")
+
+zzz <- zzz %>%
+  mutate(
+    perf_historic = if_else(
+      Division=="Wentworth" & candidate_id==37451 & Type=="Absent",
+      shim %>% filter(Type=="Absent") %>% pull(perf_historic),
+      perf_historic),
+    perf_historic = if_else(
+      Division=="Wentworth" & candidate_id==37451 & Type=="PollingPlace",
+      shim %>% filter(Type=="PollingPlace") %>% pull(perf_historic),
+      perf_historic),
+     perf_historic = if_else(
+      Division=="Wentworth" & candidate_id==37451 & Type=="Postal",
+      shim %>% filter(Type=="Postal") %>% pull(perf_historic),
+      perf_historic),
+     perf_historic = if_else(
+      Division=="Wentworth" & candidate_id==37451 & Type=="PPVC",
+      shim %>% filter(Type=="PPVC") %>% pull(perf_historic),
+      perf_historic),
+     perf_historic = if_else(
+      Division=="Wentworth" & candidate_id==37451 & Type=="PrePoll",
+      shim %>% filter(Type=="PrePoll") %>% pull(perf_historic),
+      perf_historic),
+     perf_historic = if_else(
+      Division=="Wentworth" & candidate_id==37451 & Type=="Provisional",
+      shim %>% filter(Type=="Provisional") %>% pull(perf_historic),
+      perf_historic)
+  )
+
+check <- zzz %>% 
+  group_by(Division,candidate_id) %>% 
+  summarise(n2022 = length(unique(incumbent_2022)),
+            n2019 = length(unique(incumbent_2019))) %>% 
+  ungroup() %>%
+  filter(n2022>1 | n2019>1)
+ 
+check <- zzz %>% 
+    filter(incumbent_2022!=incumbent_2019) %>%
+  distinct(Division,candidate_id,party_group,incumbent_2022,incumbent_2019)
+
+plotData <- zzz %>% 
+  filter(Type %in% c("Postal")) %>% 
+  mutate(party_group = if_else(candidate_id==37710,"IND",party_group)) %>% 
+  mutate(incumbent_2022 = if_else(candidate_id==37710,TRUE,incumbent_2022)) %>% 
+  filter(party_group %in% c("Labor","IND","GRN","Coalition")) %>%
+  mutate(color = case_when(
+    party_group == "Coalition" ~ ussc::ussc_colors("Coalition"),
+    party_group == "GRN" ~ ussc::ussc_colors("Greens"),
+    candidate_id %in% c200$candidate_id & Division %in% c200$Division ~ "#0C969E",
+    party_group == "IND" ~ ussc::ussc_colors("Independent"),
+    party_group == "Labor" ~ ussc::ussc_colors("Labor")
+    )
+  ) %>%
+  left_join(candidates %>%
+              select(Division,candidate_id,name),
+            by=c("Division","candidate_id")
+            ) %>%
+  mutate(
+    highlight = 
+      (
+        party_group=="IND" 
+        & candidate_id %in% c200$candidate_id 
+        & Division %in% c("Goldstein","Kooyong","Wentworth","Mackellar","Curtin","North Sydney")
+      ) |
+      (
+        party_group=="Coalition"
+        & Division %in% c("Goldstein","Kooyong","Wentworth","Mackellar","Curtin","North Sydney")
+      )
+  ) %>%
+  arrange(party_group,highlight,incumbent_2022)
+
+load(here("data/2019/aec_historic_2022.RData"))
+zzz <- zzz %>% 
+  left_join(aec_historic_2022 %>%
+              select(Division=DivisionName,State) %>%
+              distinct(),
+            by="Division")
+
+plotData <- plotData %>% 
+    left_join(aec_historic_2022 %>%
+              select(Division=DivisionName,State) %>%
+              distinct(),
+            by="Division")
+           
+ojs_define(pd_raw=plotData)
+```
+
+```{ojs}
+pd = transpose(pd_raw)
+```
+
+
+```{ojs}
+//| label: fig-postal-perf
+//| fig-cap: "Postal voting performance of House of Representatives candidates, relative to performance among other type of votes.  Each point shows the difference between a candidate's share of the postal vote and their share of all other vote types.   Incumbents (or candidates of incumbent parties) are denoted with filled circles, challengers are shown with open circles; data for C200-supported independents are coloured teal; Sharkie (XEN; Mayo, SA) and Katter (KAP; Kennedy, QLD) are denoted as IND for inclusion in the graph.   Data are randomly jittered in the horizontal dimension to show the density of the data and to avoid overplotting.   Roll over each data point to display details."
+Plot.plot({
+  grid: true,
+  width: 1000,
+  height: 1000,
+  insetBottom: 2,
+  insetTop: 2,
+  
+  style: {
+    fontSize: "16px"
+  },
+  
+  y: {
+    domain: [-16, 17],
+    ticks: 17,
+    tickFormat: "+",
+    label: "Share of postal vote minus vote share among other vote types (percentage points) ↑"
+  },
+  
+  x: {
+    label: ""
+  },
+
+  facet: {
+    data: pd,
+    x: "party_group",
+    frame: false,
+    marginTop: 50,
+    marginLeft: 0,
+    marginRight: 0,
+    marginBottom: 30
+    },
+    
+  fx: {
+    padding: 0.1,
+    label: ""
+  },
+  
+  marks: [
+  
+    Plot.ruleY([0], {stroke: "#333"}),
+  
+    Plot.dot(pd,
+      Plot.dodgeX(
+        {
+          filter: (d) => !d.highlight,
+          y: "perf",
+          anchor: "middle",
+          padding: 2,
+          r: 4,
+          title: (d) => `${d.Division} (${d.State}) \n ${d3.format("+.1f")(d.perf)} \n ${d.name}`,
+          stroke: (d) => d.color,
+          fill: (d) => d.incumbent_2022 ? d.color : "transparent"
+        }
+      )
+    ),
+    
+     Plot.text(pd,
+      Plot.dodgeX(
+      {
+        filter: "highlight",
+        y: "perf",
+        anchor: "middle",
+        padding: 50,
+        text: (d) => (d.incumbent_2022 ? '●' : '○') + d.Division,
+        fill: "color",
+        stroke: "#fff",
+        fontSize: "13px",
+        textAnchor: "start",
+        fontWeight: 700,
+        title: (d) => `${d.Division} (${d.State}) \n ${d3.format("+.1f")(d.perf)} \n ${d.name}`,
+      })
+    )
+    
+  ],
+  
+  tooltip: {
+  }  
+  
+})
+```
+
+Most independent candidacies are quixotic, generating low vote shares that vary little across vote types; as show in @fig-postal-perf, postal vote shares for most independents are identical to their vote shares in other forms of voting.
+
+But like Labor and Coalition candidates, incumbent independents tend to do better among postal votes than among other forms of voting.   For non-incumbent independents, including the successful, C200-supported candidates, their performance among postal vote lags their performance across over types of voting, and by substantial margins.
+
+
+# Postal vote performance and incumbency
+
+We look closer at relative performance in postal votes (RPV), comparing established, incumbent independents and independents challenging incumbents (or candidates of incumbent parties).   
+
+We also include data from 2019 --- when at least two of 2022's incumbent independents were challengers (Haines and Steggall) --- to start to assess the role of incumbency as a predictor of postal vote performance. Further, in 2019, Kerryn Phelps was the independent incumbent in Wentworth, challenged successfully by Dave Sharma, who in turn was challenged successfully by independent Allegra Spender in 2022.  
+
+These _within-division_ comparisons have the benefit of holding constant any time-invariant, divisional-level factors that might influence the postal vote performance of independents, while at the same time capturing some variation in the incumbency status of independent candidates.
+
+<a href="#tab-postal-independents">Table 4</a> presents data from this relatively small set of independent candidacies, showing (a) the level of postal vote performance relative to other vote types for both 2019 and 2022 (RPV), (b) the change (∆) in RPV as well as (c) the prevalence of postal voting in the division in 2019 and 2022 and (d) change in prevalance.   We also note the incumbency status of the independent candidate in each case.
+
+
+```{r compute-zzz-deltas} 
+zzz <- zzz %>% 
+  mutate(
+    delta=perf - perf_historic,
+    delta_prev = prev-prev_historic,
+    delta_inc = case_when(
+      incumbent_2022 & !incumbent_2019 ~ 1,
+      incumbent_2019 & !incumbent_2022 ~ -1,
+      TRUE ~ 0)
+  )
+```
+
+```{r selected-independents}
+d <- zzz %>% 
+  semi_join(c200,by=c("Division","candidate_id")) %>% 
+  filter(Type=="Postal") %>% 
+  filter(perf_historic!=0) %>% 
+  left_join(candidates %>% 
+              select(Division,candidate_id,name),
+            by=c("Division","candidate_id")) %>% 
+  rename(incumbent=incumbent_2022,
+         incumbent_historic=incumbent_2019) %>% 
+  pivot_longer(cols=c("incumbent","incumbent_historic",
+                      "perf","perf_historic",
+                      "prev","prev_historic"),
+               names_to = c(".value","set"),
+               names_sep="_") %>%
+  mutate(year=if_else(is.na(set),2022,2019)) %>%
+  mutate(incumbent = if_else(Division=="Mayo",TRUE,incumbent)) %>%
+  mutate(incumbent = if_else(year==2019 & Division=="Indi",FALSE,incumbent)) %>% 
+  mutate(name = if_else(year==2019 & Division=="Wentworth","PHELPS, Kerryn",name)) %>% 
+  arrange(Division,year) %>%
+  mutate(delta = if_else(year==2019,NA_real_,delta)) %>% 
+  mutate(delta_prev = if_else(year==2019,NA_real_,delta_prev)) %>%
+  mutate(label=paste(Division,str_to_title(name))) %>%
+  mutate(name = str_to_title(name)) %>% 
+  mutate(incumbent = if_else(incumbent,"✓","✘")) %>%
+  select(Division,name,year,incumbent,perf,delta,prev,delta_prev)
+```
+
+```{r selected-independents-make-tab}
+cc <- htmltools::withTags(
+  table(
+    id="tab-postal-independents",
+    class="display",
+    thead(
+      style=css(font.size="13px",padding.bottom="0px"),
+      tr(
+        style=css(vertical.align="bottom"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th","RPV: share of"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th")
+      ),
+       tr(
+        style=css(vertical.align="bottom"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th","postal votes"),
+        th(class="my_th"),
+        th(class="my_th","Prevalence,"),
+        th(class="my_th")
+      ),
+      tr(
+        style=css(vertical.align="bottom"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th"),
+        th(class="my_th","relative to"),
+        th(class="my_th",""),
+        th(class="my_th","postal votes"),
+        th(class="my_th","∆")
+      ),
+      
+      tr(
+        style=css(vertical.align="bottom"),
+        th(),
+        th(),
+        th(class="my_th_2","Election"),
+        th(class="my_th_2","Incumbent?"),
+        th(class="my_th_2","other vote types"),
+        th(class="my_th_2","∆ RPV"),
+        th(class="my_th_2","in division"),
+        th(class="my_th_2","prevalence")
+      )
+    )
+  )
+)
+
+datatable(
+  d,
+  elementId = "tab-postal-independents",
+  caption = "Table 4: Performance in postal votes relative to other vote types (RPV) and change, for six seats with repeated IND candidacies, 2019-2022.",
+  rownames=FALSE,
+  class=c("display","row_grouped"),
+  extensions = c("Buttons","RowGroup"),
+  container = cc, #customContainer,
+  options=list(dom="Bt",
+               searching=FALSE,
+               paging=FALSE,
+               ordering=FALSE,
+               rowGroup=list(dataSrc=0),
+               columnDefs=list(
+                 list(targets=0,visible=FALSE),
+                 list(targets=2:7,class="dt-center")
+                 ,
+                 list(targets=c(4,5,7),
+                      render = JS(
+                        "function(data,type,row,meta){",
+                        "if(!data) { return ''};",
+                        "var prefix = data < 0.0 ? '':'+';",
+                        "return prefix + data.toFixed(1);",
+                        "}"
+                      )
+                 )
+                 ,
+                 list(targets=6,
+                      render = JS(
+                        "function(data,type,row,meta){",
+                        "return data.toFixed(1) + '%';",
+                        "}"
+                      )
+                 )
+               ),
+               buttons=c("copy","csv","excel")
+  )
+) %>%
+  formatStyle(columns="incumbent",
+               color=styleEqual(levels=c("✓","✘"),
+                                values=c("green","red"))
+               ) %>%
+  formatStyle(columns="perf",
+               color = styleInterval(cuts=0,
+                                     values=c("red","blue"))
+               )
+```
+
+This small number of cases highlights again that (a) incumbent independents typically do better in postal votes than in other forms of voting; (b) that _becoming_ an incumbent boosts postal vote performance, as evidenced by the experience of Haines (Indi, VIC) and Steggall (Warringah, NSW), both transitioning relative under-performance among postals to over-performance as they transitioned from challenger to incumbent between the 2019 and 2022 elections:
+
+- Haines' relative performance among postal votes (RPV) goes from -4.0 to +1.5 between 2019 and 2022, a gain of 5.5 percentage points;
+
+- Steggall's RPV rises from -6.8 as a challenger in 2019 to +1.6 in 2022, a gain of 8.4 percentage points.  
+
+These two data points can be distinguished from the changes in RPVs for independent candidates who did _not_ transition from challenger to incumbent:
+
+- Sharkie (Mayo, SA) also sees a 5.5 improvement in RPV as an incumbent in both elections, the same as Haines, while Wilkie's RPV falls -1.2 percentage points.  
+
+- Changes in RPV for the other cases --- -4.0 for Dyson (Wannon, VIC), a challenger in both elections, and -1.2 Spender relative to Phelps (Wentworth NSW) --- further suggest that incumbency is positively associated with RPV. 
+
+Moreover, changes in the prevalence of postal voting are almost constant over this set of divisions, with little prospect of any confounding of the effect of incumbency on RPV with the increase in the use of postal voting between 2019 and 2022.
+
+
+```{r tab-postal-performance-with-2019,eval=FALSE}
+tab <- zzz %>% 
+  filter(Type %in% c("Postal")) %>%
+  filter(perf_historic!=0) %>%
+  filter(party_group %in% c("Labor","Coalition","GRN","IND")) %>%
+  group_by(party_group) %>%
+  summarise(n=n(),
+            perf=mean(perf),
+            perf_historic=mean(perf_historic),
+            delta=mean(delta),
+            prev=mean(prev),
+            prev_historic=(mean(prev_historic))) %>%
+  ungroup() %>%
+  mutate(delta_inc = 9)
+
+m <- zzz %>% 
+  filter(Type %in% c("Postal")) %>%
+  filter(perf_historic!=0) %>%
+  filter(party_group %in% c("Labor","Coalition","GRN","IND")) %>%
+  group_by(party_group,delta_inc) %>%
+  summarise(n=n(),
+            perf=mean(perf),
+            perf_historic=mean(perf_historic),
+            delta=mean(delta),
+            prev=mean(prev),
+            prev_historic=(mean(prev_historic))
+            ) %>%
+  ungroup()
+            
+tab <- bind_rows(tab,m) %>%
+  mutate(inc = factor(delta_inc,
+                      levels=c(-1,0,1,9),
+                      labels=c("Inc to Non-Inc",
+                               "No Change",
+                               "Non-Inc to Inc",
+                               "All"),
+                      ordered=TRUE)) %>%
+  group_by(party_group) %>%
+  mutate(nn=n()) %>% ungroup() %>%
+  group_by(party_group) %>%
+  mutate(did = ifelse(nn==4 & inc=="All",
+                       delta[delta_inc==1]-delta[delta_inc==-1],
+                       NA_real_)
+         ) %>%
+  ungroup() %>%
+  arrange(party_group,inc)
+  
+tab <- datatable(tab %>%
+            select(party_group,inc,n,perf,perf_historic,delta,did),
+          rownames = FALSE,
+          caption = "",
+          colnames = c("Party","Incumbency ∆","n","2022","2019","∆","∆ across incumbency ∆"),
+          extensions=c("Buttons","RowGroup"),
+          ##class=c("display","row_grouped"),
+          options=list(dom="Bt",
+                       searching=FALSE,
+                       paging=FALSE,
+                       ordering=FALSE,
+                       rowGroup=list(dataSrc=c(0)),
+                       columnDefs=list(
+                         list(targets=c(0),visible=FALSE)
+                       ),
+                       buttons=c("copy","csv","excel"))) %>%
+  formatRound(columns=~perf+perf_historic+delta+did,digits=1) %>%
+   formatStyle(
+    "did",
+    valueColumns='inc',
+    fontWeight = styleEqual(
+      levels=c("All"),
+      values=c("600"),
+      default=NULL)
+    ) %>%
+  formatStyle(
+    names(plotData),
+    valueColumns = "inc",
+    borderTop = styleEqual(
+      levels="All",
+      values="1px solid black",
+      default=NULL),
+    borderBottom = styleEqual(
+      levels="All",
+      values="1px solid black",
+      default=NULL)
+  )
+
+print(tab)
+```  
+
+Statistical tests confirm that incumbency promotes postal vote performance.   We estimate regressions of 2019-to-2022 change in RPV, with two predictors:
+
+- change in incumbency between 2019 and 2022 (+1 for 2019 challenger to 2022 incumbent, 0 for no change and -1 for 2019 incumbent to 2022 challenger)
+
+- change in the prevalence of postal voting in each division, 2019 to 2022, so that estimates of the incumbency changes are net of any effects on RPV due to the increase in the prevalence of postal voting.
+
+We estimate this regression separately for Coalition, Independent candidates and Labor candidates.   Green candidates are omitted from this "differences-in-differences" analysis, since there is no variation in the incumbency status of Greens candidates between 2019 and 2022, with Adam Bandt remaining the sole Greens House of Representatives incumbent in both elections.   We also fit this model to differences in relative performance in votes cast at pre-poll voting centres (PPVC), the other vote type to surge in popularity in 2022.
+
+@fig-regression-analysis presents these regression-based estimates of the effects of a transition to incumbency in graphical form: points correspond to the magnitude of the estimated effects and vertical lines cover 95% confidence intervals.   
+
+As foreshadowed in the tables and charts above, the effects of transitioning to incumbency are large for independents, and are also positive and distinguishable from zero for Coalition (1.4, $t$ = 1.8) and Labor candidates (1.9, $t$ = 2.2).  No such effects are found in the case of "pre-poll" votes, the other voting type to surge in popularity in 2022.
+
+```{r regression-analysis}
+m <- zzz %>%
+  filter(perf_historic!=0) %>% 
+  filter(party_group %in% c("Labor","Coalition","IND")) %>% 
+  filter(Type %in% c("Postal","PPVC")) %>%
+  group_nest(party_group,Type) %>% 
+  mutate(m=map(.x=data,~lm(delta ~ delta_prev + delta_inc,data=.x))) %>% 
+  mutate(
+    n = map(.x=data,~nrow(.x)),
+    m_tidy=map(.x=m,~broom::tidy(.x)),
+    s=map(.x=m,~broom::tidy(summary(.x),conf.int=TRUE))
+  ) %>%
+  ungroup() %>% 
+  unnest(c(n,s)) %>%
+  filter(term=="delta_inc") %>% 
+  mutate(
+    color = case_when(
+      party_group == "Coalition" ~ ussc::ussc_colors("Coalition"),
+      party_group == "IND" ~ ussc::ussc_colors("Independent"),
+      party_group == "Labor" ~ ussc::ussc_colors("Labor")
+    )
+  )
+  
+ojs_define(regression_tmp = m %>% 
+             select(party_group,Type,color,
+                    n,estimate,statistic,
+                    lo=conf.low,up=conf.high)
+           )
+```
+
+```{ojs}
+regdata = transpose(regression_tmp)
+```
+
+```{ojs}
+//| label: fig-regression-analysis
+//| fig-cap: "Effect of change in incumbency status on change in relative postal voting performance.   Points denote the estimated effect; lines extend to over 95% confidence intervals. Roll over each data point to display details."
+Plot.plot({
+  grid: true,
+  width: 1000,
+  height: 1000,
+  marginTop: 52,
+  insetTop: -6,
+  insetBottom: 2,
+  
+  style: {
+    fontSize: "16px"
+  },
+  
+  y: {
+    ticks: 12,
+    tickFormat: "+",
+    label: "Effect of change in incumbency on change in RPV ↑"
+  },
+  
+  x: {
+    label: ""
+  },
+
+  facet: {
+    data: regdata,
+    x: "Type",
+    marginLeft: 0,
+    marginTop: 22
+  },
+    
+  fx: {
+    padding: 0.1,
+    label: ""
+  },
+  
+  marks: [
+  
+    Plot.ruleY([0], {stroke: "#333"}),
+  
+    Plot.link(regdata,
+    {
+      x: "party_group",
+      y1: "lo",
+      y2: "up",
+      stroke: (d) => d.color,
+      strokeWidth: 4
+    }
+    ),
+  
+    Plot.dot(regdata,
+        {
+          y: "estimate",
+          x: "party_group",
+          r: 8,
+          title: (d) => `${d3.format(".1f")(d.estimate)} \n (t = ${d3.format(".1f")(d.statistic)}) \n n = ${d.n}`,
+          stroke: (d) => d.color,
+          fill: (d) => d.color
+        }
+    )
+
+    
+  ],
+  
+  tooltip: {
+  }  
+  
+})
+```
+
+# Further research and recommendations
+
+Incumbents appear to enjoy an advantage with respect to postal votes that they did not have as challengers.   As postal votes continue to grow in popularity, understanding the mechanisms by which this advantage arises will be vital as a general proposition, but in particular for C200-supported independents, holding seats traditionally considered Coalition-strongholds, seats in which the use of postal voting is higher than average.
+
+In addition to quantitative data analysis, qualitative work with established, incumbent independents (Steggall, Haines, Sharkie, Wilkie) will help shed light on these mechanisms.
+
+[Section 90B of the *Commonwealth Electoral Act*](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088289) entitles successful House of Representatives candidates to a version of the electoral roll with postal voting information appended for each voter; in particular see section 90B(10). Analysis of that information will be vital in helping answer the questions posed above, and to ensure that postal voting etc are not points of vulnerability for Independent candidates in future elections.
+
+Pooling this information from the AEC across multiple divisions would strengthen the analytical power and practical utility of this proposed analysis.   
+
+Given restrictions on access to the electoral roll, legal advice can inform if and how this combined analysis can be undertaken.
+
+
+
+```{r ggplots-we-wont-use,eval=FALSE}
+ggplot(zzz %>% 
+         mutate(delta_inc = factor(delta_inc)) %>% 
+         filter(Type=="Postal" & 
+                  perf_historic != 0 & 
+                  party_group %in% c("Coalition","GRN","IND","Labor")),
+       aes(x=perf_historic,y=perf,color=delta_inc)) + 
+  geom_abline(slope=1,intercept=0) +
+  geom_point() + 
+  facet_wrap(~party_group) + 
+  coord_equal()
+
+ggplot(zzz %>% 
+         mutate(delta_inc = factor(delta_inc)) %>% 
+         filter(Type=="PPVC" & 
+                  perf_historic != 0 & 
+                  party_group %in% c("Coalition","GRN","IND","Labor")),
+       aes(x=perf_historic,y=perf,color=delta_inc)) + 
+  geom_abline(slope=1,intercept=0) +
+  geom_point() + 
+  facet_wrap(~party_group) + 
+  coord_equal()
+
+```
+
+```{r,eval=FALSE}
+extras <- c(36240,32086,37710)
+
+tab <- tab %>%
+  group_by(Division) %>%
+  fill(party_group) %>% 
+  fill(candidate_id) %>% 
+  ungroup() %>% 
+  filter(party_group %in% "XEN" & Division =="Mayo" |
+           candidate_id %in% extras |
+           (candidate_id %in% c200$candidate_id & Division %in% c200$Division)
+         ) %>%
+  left_join(
+    candidates %>%
+      select(Division,name,affiliation_abb,candidate_id),
+    by=c("Division","candidate_id")
+  ) %>%
+  filter(!grepl(pattern="OAKESHOTT",name)) %>%
+  mutate(name = stringr::str_to_title(name)) %>%
+  mutate(name = gsub(pattern="O'connor",replacement="O'Connor",name,fixed=TRUE)) %>% 
+  mutate(label = paste(Division,name,sep=": ")) %>%
+  arrange(label,j) %>%
+  group_by(Division,candidate_id) %>%
+  fill(label) %>% 
+  ungroup() %>% 
+  select(label,j,
+         PollingPlace,PPVC,
+         Absent,Postal,PrePoll,Provisional)
+
+customContainer <- htmltools::withTags(
+  table(
+    class = 'display',
+    thead(
+      tr(
+        th(rowspan = 1,
+           colspan=2,
+           style=css(border.bottom="hidden"),
+           ' '),
+        
+        th(colspan = 2, 
+           style=css(
+             border.bottom="hidden",
+             text.align="center", 
+             padding.left="3px",
+             padding.right="3px",
+             padding.bottom="0"
+           ),
+           div(
+             style=css(
+               border.bottom="1px solid #ddd",
+               padding.bottom="5px"),
+             'Ordinary Votes'
+           )
+        ),
+        
+        th(colspan = 4, 
+           style=css(border.bottom="hidden",
+                     text.align="center", 
+                     padding.left="3px",
+                     padding.right="3px",
+                     padding.bottom="0"),
+           div(
+             style=css(
+                border.bottom="1px solid #ddd",
+               padding.bottom="5px"),
+           'Declaration Votes')
+           )
+        
+        ),
+      
+      tr(
+        th(),
+        th(),
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+          "Polling Place"),
+        
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+          "PPVC"),
+        
+        th(
+          style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Absent"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Postal"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Pre-poll"),
+        
+        th(style=css(text.align="right",
+                    vertical.align="bottom",
+                    padding.left="8px",
+                    padding.right="8px"),
+           "Provisional")
+      )
+      )
+    )
+)
+```
+
+
+
+
+
+```{r tab-for-later,eval=FALSE}
+datatable(tab_for_later,
+          rownames=FALSE,
+          container = customContainer,
+          extensions = c("Buttons","RowGroup"),
+          class=c("display","row_grouped"),
+          options=list(dom="Bt",
+                       searching=FALSE,
+                       paging=FALSE,
+                       scrollY="800px",
+                       scrollCollapse=TRUE,
+                       ordering=FALSE,
+                       rowGroup=list(dataSrc=c(2,3,1)),
+                       columnDefs=list(
+                        list(targets=c(1,2,3),visible=FALSE)
+                       ),
+                       buttons=c("copy","csv","excel"))) %>%
+  formatRound(columns=c("PollingPlace","PPVC","Absent",
+                    "Postal","PrePoll","Provisional"),digits=1)
+
+# kable(tab %>% select(-Division),
+#       digits=1,
+#       col.names = c("","PollingPlace","PPVC",
+#                     "Absent","Postal",
+#                     "PrePoll","Provisional")) %>%
+#   kable_styling(bootstrap_options = c("striped","hover","responsive")) %>%
+#   kableExtra::add_header_above(c(" ","Ordinary Votes"=2,"Declaration Votes"=4)) %>%
+#   pack_rows(index=table(tab$Division),
+#             label_row_css="background-color: #aaa; color: #fff;")
+```
+
+
+<!-- The following table shows the performance of `r length(unique(tab$label))` Independent candidates across a variety of vote types, spanning not just C200 candidates, but established, incumbent independents as well (e.g., Wilkie in Clark, Steggal in Warrigah, Haines in Indi) and Dai Le in Fowler. -->
+
+<!-- We provide some summary analysis of this detailed information, below, to draw out comparisons between novice C200-based candidates and established independents with respect to postal vote performance. -->

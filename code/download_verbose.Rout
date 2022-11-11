@@ -1,0 +1,305 @@
+
+R Under development (unstable) (2022-06-27 r82527) -- "Unsuffered Consequences"
+Copyright (C) 2022 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin21.6.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ########################################################
+> ## getverbose
+> ##
+> ## simon jackman
+> ## simon.jackman@sydney.edu.au
+> ## ussc, univ of sydney
+> ## 2018-07-30 09:08:04
+> ## 2022-05-21 00:49:29
+> ########################################################
+> library(tidyverse)
+── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──
+✔ ggplot2 3.3.6     ✔ purrr   0.3.4
+✔ tibble  3.1.7     ✔ dplyr   1.0.9
+✔ tidyr   1.2.0     ✔ stringr 1.4.0
+✔ readr   2.1.2     ✔ forcats 0.5.1
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+> library(here)
+here() starts at /Volumes/GoogleDrive/Shared drives/C200 TEAM: ANALYTICS/Polling/simon_jackman/results
+> library(rvest)
+
+Attaching package: ‘rvest’
+
+The following object is masked from ‘package:readr’:
+
+    guess_encoding
+
+> library(xml2)
+> library(RCurl)
+
+Attaching package: ‘RCurl’
+
+The following object is masked from ‘package:tidyr’:
+
+    complete
+
+> 
+> source(here("code/goLive.R"))
+> 
+> # aec_files <- getAEC_filelist()
+> #
+> # ## get those that we don't have
+> # haveFiles_file <- here(paste("data",year,"haveFiles.csv",sep="/"))
+> # if(!file.exists(haveFiles_file)){
+> #   haveFiles <- list.files(path=here(paste("data",year,"Detailed/Verbose",sep="/")),
+> #                         pattern="*.zip") %>%
+> #   str_remove(pattern="\\.zip")
+> #   write.csv(haveFiles,file = haveFiles_file,row.names = FALSE)
+> # }
+> # haveFiles <- read_csv(file=haveFiles_file) %>% pull(x)
+> #
+> # getFiles <- setdiff(aec_files,haveFiles)
+> # print(getFiles)
+> # flag <- length(getFiles)>0
+> #
+> # ## download
+> # for(theFile in getFiles){
+> #   theURL <- paste("ftp://",aec_url,"/",
+> #                   theEvents_num,
+> #                   "/Detailed/Verbose/",
+> #                   theFile,
+> #                   ".zip",
+> #                   sep="")
+> #   destFile <- paste0("/tmp/",theFile,".zip")
+> #   if(!file.exists(destFile)){
+> #     download.file(theURL,destFile)
+> #   }
+> # }
+> #
+> # if(flag){
+>   source(here("code/parse_functions.R"))
+>   source(here("code/make_working.R"))
+trying URL 'ftp://mediafeed.aec.gov.au/27966/Detailed/Verbose/aec-mediafeed-Detailed-Verbose-27966-20220628215000.zip'
+Content type 'unknown' length 2486790 bytes (2.4 MB)
+==================================================
+>   source(here("code/declaration_vote_progress.R"))
+trying URL 'https://tallyroom.aec.gov.au/Downloads/GeneralDecVotesIssuedByDivisionDownload-27966.csv'
+Content type 'application/octet-stream' length 7542 bytes
+==================================================
+downloaded 7542 bytes
+
+downloaded dvotes_isseded file ok
+Rows: 152 Columns: 9
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (2): DivisionNm, StateAb
+dbl (7): DivisionID, Provisional, Absent, PrePoll, PrePollOwnDivision, Posta...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+trying URL 'https://tallyroom.aec.gov.au/Downloads/GeneralDecVotesReceivedByDivisionDownload-27966.csv'
+Content type 'application/octet-stream' length 7496 bytes
+==================================================
+downloaded 7496 bytes
+
+trying URL 'https://tallyroom.aec.gov.au/Downloads/GeneralDecVotesReceivedByDivisionDownload-27966.csv'
+Content type 'application/octet-stream' length 7496 bytes
+==================================================
+downloaded 7496 bytes
+
+downloaded dvotes_receieved file ok
+Rows: 151 Columns: 9
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (2): DivisionNm, StateAb
+dbl (7): DivisionID, Provisional, Absent, PrePoll, PrePollOwnDivision, Posta...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Adelaide 
+Aston 
+Ballarat 
+Banks 
+Barker 
+Barton 
+Bass 
+Bean 
+Bendigo 
+Bennelong 
+Berowra 
+Blair 
+Blaxland 
+Bonner 
+Boothby 
+Bowman 
+Braddon 
+Bradfield 
+Brand 
+Brisbane 
+Bruce 
+Burt 
+Calare 
+Calwell 
+Canberra 
+Canning 
+Capricornia 
+Casey 
+Chifley 
+Chisholm 
+Clark 
+Cook 
+Cooper 
+Corangamite 
+Corio 
+Cowan 
+Cowper 
+Cunningham 
+Curtin 
+Dawson 
+Deakin 
+Dickson 
+Dobell 
+Dunkley 
+Durack 
+Eden-Monaro 
+Fadden 
+Fairfax 
+Farrer 
+Fenner 
+Fisher 
+Flinders 
+Flynn 
+Forde 
+Forrest 
+Fowler 
+Franklin 
+Fraser 
+Fremantle 
+Gellibrand 
+Gilmore 
+Gippsland 
+Goldstein 
+Gorton 
+Grayndler 
+Greenway 
+Grey 
+Griffith 
+Groom 
+Hasluck 
+Hawke 
+Herbert 
+Higgins 
+Hindmarsh 
+Hinkler 
+Holt 
+Hotham 
+Hughes 
+Hume 
+Hunter 
+Indi 
+Isaacs 
+Jagajaga 
+Kennedy 
+Kingsford Smith 
+Kingston 
+Kooyong 
+La Trobe 
+Lalor 
+Leichhardt 
+Lilley 
+Lindsay 
+Lingiari 
+Longman 
+Lyne 
+Lyons 
+Macarthur 
+Mackellar 
+Macnamara 
+Macquarie 
+Makin 
+Mallee 
+Maranoa 
+Maribyrnong 
+Mayo 
+McEwen 
+McMahon 
+McPherson 
+Melbourne 
+Menzies 
+Mitchell 
+Monash 
+Moncrieff 
+Moore 
+Moreton 
+New England 
+Newcastle 
+Nicholls 
+North Sydney 
+O'Connor 
+Oxley 
+Page 
+Parkes 
+Parramatta 
+Paterson 
+Pearce 
+Perth 
+Petrie 
+Rankin 
+Reid 
+Richmond 
+Riverina 
+Robertson 
+Ryan 
+Scullin 
+Shortland 
+Solomon 
+Spence 
+Sturt 
+Swan 
+Sydney 
+Tangney 
+Wannon 
+Warringah 
+Watson 
+Wentworth 
+Werriwa 
+Whitlam 
+Wide Bay 
+Wills 
+Wright 
+>   source(here("code/changing_hands.R"))
+> 
+>   save("data","dvotes","dvote_detail","changing_hands",
++        file=here(paste("data",year,"working/latest.RData",sep="/"))
++   )
+> 
+>   source(here("code/progress.R"))
+Rows: 2860 Columns: 1
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (1): value
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+trying URL 'ftp://mediafeed.aec.gov.au/27966/Detailed/Verbose/aec-mediafeed-Detailed-Verbose-27966-20220628152029.zip'
+Content type 'unknown' length 2486789 bytes (2.4 MB)
+==================================================
+parsing file 1 of 32 
+ aec-mediafeed-Detailed-Verbose-27966-20220628152029.zip 
+parsed ok
+updating for fp 
+Error in UseMethod("distinct") : 
+  no applicable method for 'distinct' applied to an object of class "NULL"
+Calls: source ... eval -> write_to_files -> updater -> %>% -> distinct
+Execution halted
