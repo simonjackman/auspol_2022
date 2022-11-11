@@ -9,5 +9,7 @@ analysis/*png
 analysis/*html
 analysis/*_cache
 analysis/site_libs
-code/.RData*
+docs/analysis/sa1.*
+analysis/sa1.*
+data
 /.quarto/
