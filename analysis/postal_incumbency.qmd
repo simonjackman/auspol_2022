@@ -1843,10 +1843,7 @@ In addition to quantitative data analysis, qualitative work with established, in
 
 [Section 90B of the *Commonwealth Electoral Act*](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088289) entitles successful House of Representatives candidates to a version of the electoral roll with postal voting information appended for each voter; in particular see section 90B(10). Analysis of that information will be vital in helping answer the questions posed above, and to ensure that postal voting etc are not points of vulnerability for Independent candidates in future elections.
 
-Pooling this information from the AEC across multiple divisions would strengthen the analytical power and practical utility of this proposed analysis.   
-
-Given restrictions on access to the electoral roll, legal advice can inform if and how this combined analysis can be undertaken.
-
+Pooling this information from the AEC across multiple divisions would strengthen the analytical power and practical utility of this proposed analysis.   But given restrictions on access to the electoral roll, legal advice can inform if and how this combined analysis can be undertaken.
 
 
 ```{r ggplots-we-wont-use,eval=FALSE}
