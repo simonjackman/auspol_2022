@@ -1,8 +1,8 @@
 ---
-title: "Discrepancies in the AEC's voter turnout counts"
+title: "Discrepancies in Australian Electoral Commission voter turnout counts"
 title-block-banner: true
 description: |
-  After each federal election the Australian Electoral Commission produces a file of counts of voters by the SA1 in which they reside and the polling places at which they turned out for House of Representatives elections.   Curiously, summing these counts to the polling place level produces voter turnout counts that do not match the turnout figures published elsewhere by the AEC in official election results.  Why?   
+  After each federal election the Australian Electoral Commission produces a file of counts of voters by the SA1 in which they reside and the polling places at which they turned out for House of Representatives elections.   Curiously, summing these counts to the polling place level produces voter turnout counts that do not match the turnout figures published elsewhere by the AEC in official election results.  Although the discrepancies are small, better understanding their sources would offer reassurance about election integrity, consistent with the norms of transparency and rigour that are enviable hallmarks of Australian election administration. 
 date: now
 date-format: "h:mmA D MMMM YYYY"
 author:
@@ -11,9 +11,8 @@ author:
     email: "simonjackman@icloud.com"
 format:
   html:
-    theme:
-      - cosmo
-      - custom.scss
+    theme: cosmo
+    css: highlights.css
     mainfont: Avenir
     fontsize: 16px
     toc: true
@@ -55,11 +54,13 @@ execute:
   - itinerant voters
   - declaration votes issued but not returned for counting
 
-- We seek comments from the #auspol community and the AEC.
+- Australia has an enviable history of non-partisan, professional election administration.  The AEC is exemplary in making election results for the entire country available in real time.   It is wholly consistent with the AEC's norms of transparancy and rigour to better understand the discrepancies described in this report. Comments from the #auspol community and the AEC would be most welcome.
 
 # The AEC's SA1 file
 
-The AEC has produced a [file](https://www.aec.gov.au/Elections/Federal_Elections/2022/files/downloads/2022-federal-election-votes-sa1.csv "AEC SA1 vote statistics") that provides House of Representatives voter turnout counts from the 2022 election at each of the polling places utilised by the voters residing in each SA1 (shorthand for the ["Statistical Area 1"](https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/main-structure-and-greater-capital-city-statistical-areas/statistical-area-level-1), the smallest geographical unit for which the Australian Bureau of Statistics provides aggregates of Census characteristics).
+The AEC has produced a [file](https://www.aec.gov.au/Elections/Federal_Elections/2022/files/downloads/2022-federal-election-votes-sa1.csv "AEC SA1 vote statistics") that provides House of Representatives voter turnout counts from the 2022 election at each of the polling places utilised by the voters residing in small geographic areas.  The file is routinely produced after each election, sometimes known as the "catchment file", since it helps analysts and the AEC itself identify the geographic areas serviced by polling places (the "catchment" area of each polling place). 
+
+In recent years this file has been called the "SA1 file", with "SA1" the standard abbreviation for ["Statistical Area 1"](https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/main-structure-and-greater-capital-city-statistical-areas/statistical-area-level-1), the smallest geographical unit for which the Australian Bureau of Statistics provides aggregates of Census characteristics.
 
 ```{r}
 library(knitr)
@@ -70,7 +71,7 @@ sa1 <-
   filter(votes > 0)
 ```
 
-The first 25 records of this file are:
+The first 25 records of the 2022 SA1 file are:
 
 ```{r}
 tmp <- sa1 %>% slice(1:25)
@@ -94,8 +95,7 @@ Inputs.table(s2, {
 
 where
 
-- `ccd_id` corresponds to a seven digit version of the ABS's 11-digit SA1 identifiers as used in the 2016 Census;
-<!-- with `ccd` referring to "Census Collection District", a deprecated unit of ABS Census geography. -->
+- `ccd_id` corresponds to Census Collection District, a [deprecated](https://www.abs.gov.au/websitedbs/censushome.nsf/4a256353001af3ed4b2562bb00121564/e45142948304157cca257a4b000a6126!OpenDocument) element of the Australian Statistical Geography Standard (ASGS).  This label appears to be an anachronism, since in fact, the so-called CCDs on this file appear to be 7 digit identifiers for SA1s  [("Statistical Area 1")](https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/main-structure-and-greater-capital-city-statistical-areas/statistical-area-level-1) used in the 2016 Census.  The ABS provides a correspondence mapping from 2016 SA1s to 2021 SA1s.
 
 - `pp_id` and `pp_nm` uniquely identify polling places. 
 <!-- with the "0" `pp_id` code used for forms of voter turnout aside from attending a polling places in the voter's electoral division. -->
@@ -234,11 +234,11 @@ nfa_16 <- d_01_16 %>%
 ## Itinerant voters
 Other possible sources of an undercount on the SA1 files are voters lacking a fixed address, and hence unassigned to a conventional SA1.  Consistent with the universalism inherent in Australia's system of compulsory voter enrolment and turnout, the franchise is not restricted to citizens with a fixed place of residence and [S96 _CEA_](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088299) deals with the enrolment of "itinerant electors".   
 
-The ABS uses special SA1 codes ending in `49999` for 
+The ABS uses SA1 codes ending in `49999` for 
 `r format(sum(nfa$Australian_citizen_P),big.mark=",")` Australian citizens counted by the 2021 Census but without a fixed address; the corresponding count on the 2016 Census file (recalling that 2016 SA1s are used by the AEC on the 2022 SA1 turnout file) is
 `r format(sum(nfa_16$Australian_citizen_P),big.mark=",")`.  None of the 2016 ABS SA1 codes for "no fixed address" appear on the SA1 file.  
 
-We should not expect especially high turnout among the adult, citizen, itinerant population.  Nonetheless it seems that any itinerant voters that do turn out would not contribute to the counts on the SA1 file.   In turn, turnout by itinerant electors will push the SA1 file in the direction of a turnout undercount relative to AEC results.
+We should not expect especially high turnout among the adult, citizen, itinerant population.  Nonetheless it seems that any itinerant voters that _do_ turn out would not contribute to the counts on the SA1 file.   In turn, turnout by itinerant electors will push the SA1 file in the direction of a turnout undercount relative to AEC results.
 
 # Discrepancies by polling place & vote type
 
@@ -300,8 +300,8 @@ Inputs.table(compareTab,
       pp_nm: "Polling Place",
       v_result: "AEC results turnout",
       v_sa1: "SA1 file turnout",
-      delta: "Difference",
-      delta_per: "Difference %"
+      delta: "∆",
+      delta_per: "∆%"
     },
     format: {
       delta_per: x => x.toFixed(1),
@@ -510,7 +510,7 @@ Inputs.table(compareTab_div,
 )
 ```
 
-## Correlates of discrepancies 
+# Correlates of discrepancies 
 
 Divisions in suburban Sydney produces larger discrepancies in official AEC House turnout and divisional turnout in the SA1 file: Werriwa, Blaxland, Watson, Banks, Kingsford Smith, etc. Higher proportions of NESH voters is one of the distinguishing characteristics of these divisions.
 
@@ -752,7 +752,7 @@ import {Plot} from "@mkfreeman/plot-tooltip"
 dd = transpose(dd_raw)
 viewof predictor = Inputs.select(dd.map(d => d.j),
     {
-      label: "Predictor: ",
+      label: "Correlate: ",
       sort: true,
       unique: true
     }
