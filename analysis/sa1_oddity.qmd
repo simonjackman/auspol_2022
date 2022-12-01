@@ -7,8 +7,12 @@ date: now
 date-format: "h:mmA D MMMM YYYY"
 author:
   - name: "Professor Simon Jackman"
+    orcid: 0000-0001-7421-4034
     affiliation: "University of Sydney"
     email: "simonjackman@icloud.com"
+    url: https://simonjackman.netlify.app
+website:
+  google-analytics: 'G-DD0XG6JZDH'
 format:
   html:
     theme: cosmo
