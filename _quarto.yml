@@ -1,3 +1,6 @@
 project:
   type: website
   output-dir: docs
+website:
+  google-analytics: 'G-DD0XG6JZDH'
+
