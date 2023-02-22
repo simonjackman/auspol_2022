@@ -5,33 +5,6 @@ description: |
   We provide estimates of vote shares at the SA1 level from the 2022 Australian federal election, making use of a mapping from polling places to SA1s provided by the Australian Electoral Commission and methods for solving inverse problems from statistics, computer science and the social sciences.
 date: now
 date-format: "h:mmA D MMMM YYYY"
-author:
-  - name: "Professor Simon Jackman"
-    orcid: 0000-0001-7421-4034
-    affiliation: "University of Sydney"
-    email: "simonjackman@icloud.com"
-    url: https://simonjackman.netlify.app
-website:
-  google-analytics: 'G-DD0XG6JZDH'
-format:
-  html:
-    theme: cosmo
-    css: custom.css
-    mainfont: Avenir Next
-    fontsize: 16px
-    toc: true
-    number-sections: true
-    fig-width: 6.5
-    fig-height: 6.5
-    echo: false
-    code-tools: true
-    smooth-scroll: true
-    self-contained: true
-    include-in-header: 
-      file: "js/external_load.js"
-tbl-cap-location: bottom    
-crossref:
-  tbl-title: Table
 execute:
   keep-md: false
   warning: false
@@ -705,7 +678,7 @@ sa1_wentworth_shp <-
 geojsonio::geojson_write(sa1_wentworth_shp,
                          file = here("data/sa1_wentworth_shp.json"))
 
-wentworth_shp <- terra::vect(here("../auspol_2022/data/2022/CED_shape")) %>% 
+wentworth_shp <- terra::vect(here("data/2022/CED_shape")) %>% 
   st_as_sf() %>% 
   filter(Elect_div == "Wentworth") %>% 
   st_make_valid()
@@ -730,9 +703,9 @@ cdata = transpose(count_long_ojs)
 ```
 
 ```{ojs}
-wentworth_json     = await FileAttachment("../data/2022/wentworth/wentworth_shp.json").json()
-sa1_wentworth_json = await FileAttachment("../data/2022/wentworth/sa1_wentworth_shp.json").json()
-pp_wentworth_json  = await FileAttachment("../data/2022/wentworth/pp_wentworth.json").json()
+wentworth_json     = await FileAttachment("../../data/2022/wentworth/wentworth_shp.json").json()
+sa1_wentworth_json = await FileAttachment("../../data/2022/wentworth/sa1_wentworth_shp.json").json()
+pp_wentworth_json  = await FileAttachment("../../data/2022/wentworth/pp_wentworth.json").json()
 width = 800
 height= 800
 ```

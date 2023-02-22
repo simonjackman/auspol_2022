@@ -1,5 +1,6 @@
 /*-- scss:defaults --*/
 $headings-font-weight:  500 !default;
+$headings-font-color:   "#fff" !default;
 $h1-font-size:          1.67rem !default;
 $h2-font-size:          1.41rem !default;
 $h2-border-bottom:      0px;
@@ -8,6 +9,10 @@ $h2-border-bottom:      0px;
 .title {
     font-size: 2.5rem;
     letter-spacing: -0.05em;
+}
+
+h1 {
+  color: $headings-font-color;
 }
 
 h2, h3, h4, h5, h6 {

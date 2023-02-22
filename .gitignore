@@ -14,3 +14,6 @@ analysis/sa1.*
 data
 code/.R*
 /.quarto/
+/.env/
+
+/env/

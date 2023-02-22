@@ -1,15 +1,23 @@
 ---
 title: "Candidate and party performance across forms of voting"
-author: 
-  - Simon Jackman
-date: now
-date-format: "h:mmA D MMMM YYYY"
+title-block-banner: true
+description: |
+  Over half of the Australian electorate did not vote at a polling place on Election Day in 2022.  How does support for political parties or candidates vary across different forms of voting?  
+author:
+  - name: "Professor Simon Jackman"
+    orcid: 0000-0001-7421-4034
+    affiliation: "University of Sydney"
+    email: "simonjackman@icloud.com"
+    url: https://simonjackman.netlify.app
+website:
+  google-analytics: 'G-DD0XG6JZDH'
+date: 2022-06-22
+date-format: "D MMMM YYYY"
 format:
   html:
-    theme:
-      - cosmo
-      - custom.scss
-    mainfont: Avenir
+    theme: cosmo
+    css: custom.css
+    mainfont: Avenir Next
     fontsize: 16px
     toc: true
     fig-width: 8
@@ -37,8 +45,14 @@ execute:
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 ```
 ```{=html}
-<script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.5"></script>
+<script src="https://cdn.jsdelivr.net/npm/@observablehq/plot"></script>
 ```
+```{=html}
+<script>
+</script>
+```
+
+
 
 ```{r setup}
 library(tidyverse)
@@ -48,11 +62,15 @@ library(DT)
 library(htmltools)
 library(knitr)
 library(kableExtra)
-options(knitr.kable.NA=' ')
+options(knitr.kable.NA = ' ')
 source(here("code/goLive.R"))
 source(here("code/parse_functions.R"))
-load(here(paste("data",year,"preload/pre_load.RData",sep="/")))
-load(here(paste("data",year,"working/latest.RData",sep="/")))
+load(here(paste(
+  "data", year, "preload/pre_load.RData", sep = "/"
+)))
+load(here(paste(
+  "data", year, "working/latest.RData", sep = "/"
+)))
 
 c200 <- tribble(
   ~Division,     ~candidate_id, ~support, ~elected,
@@ -270,7 +288,8 @@ ojs_define(vtype = tmp)
 ojs_define(yhat = m)
 ```
 
-@fig-vote-type-ojs displays the rates at which voters use different methods of voting by division, comparing 2019 rates (horizontal axis) to 2022 rates (vertical axis). Divisions where Independent candidates were supported by C200 are shown in the lower row of @fig-vote-type-ojs.
+@fig-vote-type-ojs displays the rates at which voters use different methods of voting by division, comparing 2019 rates (horizontal axis) to 2022 rates (vertical axis). 
+<!-- Divisions where Independent candidates were supported by C200 are shown in the lower row of @fig-vote-type-ojs. -->
 
 ```{ojs}
 vtype_data = transpose(vtype)
@@ -460,11 +479,11 @@ tooltipPlugin = (Plot) => {
 
 ```{ojs}
 //| label: fig-vote-type-ojs
-//| fig-cap: "Postal and PPVC voting surged in 2022, and in-person, Election Day voting fell to less than 50% of 2022 turnout.  Each column of plots corresponds to a form of voting; the two rows separate divisions by whether C200 provided support.   Each data point is a House of Representatives division; percentages are of method of voting (including informal ballots).  Orange lines indicate trends.  Roll over each data point to display division name."
+//| fig-cap: "Postal and PPVC voting surged in 2022, and in-person, Election Day voting fell to less than 50% of 2022 turnout.  Each column of plots corresponds to a form of voting.   Each data point is a House of Representatives division; percentages are of method of voting (including informal ballots).  Orange lines indicate trends.  Roll over each data point to display division name."
 Plot.plot({
   grid: false,
   width: 1020,
-  height: 680,
+  height: 480,
   insetTop: 18,
   
   style: {
@@ -473,7 +492,7 @@ Plot.plot({
   
   x: {
     label: "2019 Percentage →",
-    labelOffset: 42 
+    labelOffset: 0
   },
   
   y: {
@@ -482,12 +501,9 @@ Plot.plot({
 
   facet: {
     data: vtype_data,
-    x: "Type",
-    y: "c200",
-    marginTop: 60,
-    marginLeft: 24,
-    marginRight: 24,
-    marginBottom: 40
+    x: "Type"
+    //y: "c200",
+    //marginRight: 60 
     },
     
   fx: {
@@ -495,12 +511,11 @@ Plot.plot({
     labelOffset: 48
   },
   
-  fy: {
-    axis: 'left',
-    labelAnchor: 'center',
-    label: 'C200 supported',
-    labelOffset: 14
-  },
+  /* fy: {
+    axis: 'right',
+    padding: 0.1,
+    label: 'C200\nsupported'
+  }, */
   
   marks: [
     Plot.link([1],

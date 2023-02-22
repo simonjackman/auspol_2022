@@ -1,6 +1,37 @@
 project:
   type: website
   output-dir: docs
+
 website:
   google-analytics: 'G-DD0XG6JZDH'
+
+author:
+  - name: "Professor Simon Jackman"
+    affiliation: "University of Sydney"
+    email: "simonjackman@icloud.com"
+    orcid: 0000-0001-7421-4034
+    url: https://simonjackman.netlify.app
+
+toc: true
+
+format:
+  html:
+    theme: cosmo
+    css: analysis/custom.css
+    mainfont: Avenir Next
+    fontsize: 16px
+    toc: true
+    number-sections: true
+    fig-width: 6.5
+    fig-height: 6.5
+    echo: false
+    code-tools: true
+    smooth-scroll: true
+    self-contained: true
+    include-in-header:
+      file: js/external_load.js
+
+tbl-cap-location: bottom
+crossref:
+  tbl-title: Table
 
