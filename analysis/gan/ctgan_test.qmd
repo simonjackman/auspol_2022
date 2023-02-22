@@ -1,0 +1,44 @@
+---
+title: "ctgan_test"
+format: pdf
+---
+
+```{python}
+import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
+```
+
+```{r}
+knitr::knit_exit()
+```
+
+```{python}
+from sdv.demo import load_tabular_demo
+data = load_tabular_demo('student_placements')
+```
+
+```{python}
+from sdv.tabular import GaussianCopula
+
+model = GaussianCopula(
+  primary_key='student_id',
+  field_distributions={
+    'experience_years': 'gaussian_kde'
+    },
+  enforce_min_max_values=False
+  )
+model.fit(data)
+```
+
+```{python}
+distributions = model.get_distributions()
+```
+
+
+```{r}
+d <- reticulate::py$distributions
+print(d)
+```
+
+

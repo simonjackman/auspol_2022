@@ -1,0 +1,180 @@
+---
+title: "gan_demo"
+format: html
+standalone: true
+---
+
+
+```{r}
+library(keras)
+library(EBImage)
+
+mnist <- dataset_mnist()
+str(mnist)
+c(c(trainx,trainy),
+  c(testx,testy)
+  ) %<-% mnist
+
+table(trainy)
+```
+
+```{r}
+trainx <- trainx[trainy == 8,,]
+par(mfrow=c(8,8),mar=rep(0,4))
+
+for(i in 1:64){
+  plot(as.raster(trainx[i,,],max=255))
+}
+```
+
+```{r}
+par(mfrow=c(1,1))
+```
+
+```{r}
+trainx <- array_reshape(trainx,c(nrow(trainx),28,28,1))
+trainx <- trainx/255
+```
+
+# Generator network
+```{r}
+h <- 28
+w <- 28
+c <- 1
+l <- 28
+
+gi <- layer_input(shape = l)
+go <- gi %>% layer_dense(units=32 * 14 * 14) %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_reshape(target_shape = c(14,14,32)) %>% 
+  layer_conv_2d(filters = 32,kernel_size = 5,padding = "same") %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_conv_2d_transpose(filters=32,kernel_size = 4,strides = 2,padding = "same") %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_conv_2d(filters=64,kernel_size = 5,padding="same") %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_conv_2d(filters=1,kernel_size = 5,activation = "tanh", padding = "same")
+
+g <- keras_model(gi,go)
+summary(g)
+```
+
+# Discriminator network
+```{r}
+di <- layer_input(shape=c(h,w,c))
+do <- di %>% 
+  layer_conv_2d(filters = 64,kernel_size = 4) %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_conv_2d(filters = 64, kernel_size = 4, strides=2) %>% 
+  layer_activation_leaky_relu() %>% 
+  layer_flatten() %>% 
+  layer_dropout(rate = .3) %>% 
+  layer_dense(units=1,activation = "sigmoid") 
+
+d <- keras_model(di,do)
+summary(d)
+```
+
+## Compile 
+```{r}
+d %>% compile(optimizer="rmsprop",loss="binary_crossentropy")
+
+## Freeze weights
+freeze_weights(d)
+```
+
+# GAN definition
+```{r}
+#| label: gan
+gani <- layer_input(shape=l)
+gano <- gani %>% g %>% d
+gan <- keras_model(gani,gano)
+gan %>% compile(optimizer="rmsprop",loss="binary_crossentropy")
+summary(gan)
+```
+
+# Training the network
+```{r}
+b <- 50
+M <- floor(dim(trainx)[1]/b)
+dir <- "gan_img"
+dir.create(dir)
+start <- 1
+dloss <- NULL
+gloss <- NULL
+```
+
+
+## Generate `r M` fake images
+
+```{r}
+#| label: generate-fake-images
+for (i in 1:M) {
+  noise <- matrix(rnorm(b * l), nrow = b, ncol = l)
+  fake <- g %>% predict(noise)
+  ## Combine real and fake
+  
+  start <- (i-1)*b + 1
+  stop <- start + b - 1
+  real <- trainx[start:stop, , ,]
+  rows <- nrow(real)
+  real <- array_reshape(real,
+                        c(nrow(real), 28, 28, 1))
+  
+  both <- array(0, dim = c(rows * 2, dim(real)[-1]))
+  both[1:rows, , ,] <- fake
+  both[(rows + 1):(rows * 2), , , ] <- real
+  labels <- rbind(matrix(runif(b, .9, 1),
+                         nrow = b, ncol = 1),
+                  matrix(runif(b, 0, 0.1),
+                         nrow = b, ncol = 1))
+  
+  ## Train discriminator
+  dloss[i] <- d %>% train_on_batch(both, labels)
+  
+  
+  ## Train generator using gan
+  fakeAsReal <- array(runif(b, 0, .1), dim = c(b, 1))
+
+  gloss[i] <- gan %>% train_on_batch(noise, fakeAsReal)
+  
+  ## Save fake images
+  
+  f <- fake[1, , , ]
+  dim(f) <- c(28, 28, 1)
+  image_array_save(f, path = file.path(dir,
+                                       paste0("f",
+                                              sprintf('%0.3d', i-1),
+                                              ".png")))
+  
+}
+```
+
+# Review results and improvement
+
+## Plot loss
+
+```{r}
+x <- 1:M
+plot(x,dloss,col="red",type="l",ylim=c(0,max(gloss)),xlab="Iterations",ylab="loss")
+lines(x,gloss,col="black",type="l")
+legend("topright",legend=c("Discriminator loss","GAN Loss"),col=c("red","black"),lty=1:2,cex=1)
+
+```
+
+
+## Inspect fake images
+```{r}
+temp <- list.files(path="gan_img",pattern="*.png",full.names=TRUE)
+mypic <- list()
+img_seq <- round(seq(1,M,length=min(c(M,100))))
+for(i in 1:length(img_seq)){
+  mypic[[i]] <- readImage(temp[[img_seq[i]]])
+}
+par(mfrow=c(10,10))
+for(i in 1:length(img_seq)) plot(mypic[[i]])
+```
+
+## Improvement
+
+

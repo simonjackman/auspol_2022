@@ -1,0 +1,174 @@
+h2 {
+  border-bottom: none;
+}
+
+.header-section-number {
+  color: #000;
+}
+
+.highlights {
+ background-color: #cfcfcf;
+ font-weight: 500;
+ border-radius: .33rem;
+ margin-top: -6px !important;
+ margin-bottom: 18px;
+}
+
+.highlights h1 {
+  margin-bottom: 0.25em;
+  margin-left: 0.25em;
+}
+.nav-link {
+  font-weight: 400;
+}
+
+label, select {
+  font-size: 11px !important;
+}
+
+
+.leaflet-container {
+      font-family: "Avenir Next", "Helvetica Neue", Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+
+.leaflet-tooltip-left:before {
+    right: 0;
+    margin-right: -12px;
+    border-left: 0;
+    border-left-color: rgba(0, 0, 0, 0);
+}
+.leaflet-tooltip-right:before {
+    left: 0;
+    margin-left: -12px;
+    border-right: 0;
+    border-right-color: rgba(0, 0, 0, 0);
+    }
+
+.leaflet-tooltip-own {
+    position: absolute;
+    padding: 4px;
+    background-color: rgba(0, 0, 0, 0);
+    border: 0 solid #000;
+    color: #000;
+    white-space: nowrap;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.info {
+    padding: 2px 2px;
+    font: 14px/16px "Avenir Next"", Helvetica, sans-serif;
+    background: rgba(255,255,255,0.8);
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border-radius: 5px;
+}
+
+.info h4 {
+    margin: 0 0 4px;
+}
+
+.leaflet_popup_tab {
+  margin-bottom: 2px;
+}
+
+.leaflet_popup_tab td {
+  padding: 0 6px;
+}
+
+svg, .observablehq {
+  font-family: Avenir Next, system-ui, sans-serif !important;
+}
+
+.katex {
+  font: normal 1.00em Avenir Next, KaTeX_Main, Times New Roman, serif;
+  line-height: inherit;
+}
+
+.katex .textrm {
+  /* font-family: KaTeX_Main; */
+  font-family: Avenir Next;
+}
+
+.katex .textsf {
+  font-family: KaTeX_SansSerif;
+}
+
+.katex .texttt {
+  font-family: KaTeX_Typewriter;
+}
+
+.katex .mathnormal {
+  /* font-family: KaTeX_Math; */
+  font-family: Avenir Next;
+  font-style: italic;
+}
+
+.katex .mathit {
+  /* font-family: KaTeX_Main; */
+  font-family: Avenir Next;
+  font-style: italic;
+}
+
+.katex .mathrm {
+  font-family: Avenir Next;
+  font-style: normal;
+}
+
+.katex .mathbf {
+  /* font-family: KaTeX_Main; */
+  font-family: Avenir Next;
+  font-weight: bold;
+}
+.katex .boldsymbol {
+  font-family: Avenir Next, KaTeX_Math;
+  font-weight: bold;
+  font-style: italic;
+}
+.katex .amsrm {
+  font-family: KaTeX_AMS;
+}
+.katex .mathbb,
+.katex .textbb {
+  font-family: KaTeX_AMS;
+}
+.katex .mathcal {
+  font-family: KaTeX_Caligraphic;
+}
+.katex .mathfrak,
+.katex .textfrak {
+  font-family: KaTeX_Fraktur;
+}
+.katex .mathtt {
+  font-family: KaTeX_Typewriter;
+}
+.katex .mathscr,
+.katex .textscr {
+  font-family: KaTeX_Script;
+}
+.katex .mathsf,
+.katex .textsf {
+  font-family: KaTeX_SansSerif;
+}
+.katex .mathboldsf,
+.katex .textboldsf {
+  font-family: KaTeX_SansSerif;
+  font-weight: bold;
+}
+.katex .mathitsf,
+.katex .textitsf {
+  font-family: KaTeX_SansSerif;
+  font-style: italic;
+}
+.katex .mainrm {
+  /* font-family: KaTeX_Main; */
+  font-family: Avenir Next;
+  font-style: normal;
+}
+

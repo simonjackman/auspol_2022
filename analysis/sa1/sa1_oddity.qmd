@@ -1,0 +1,912 @@
+---
+title: "Discrepancies in Australian Electoral Commission voter turnout counts"
+title-block-banner: true
+description: |
+  After each federal election the Australian Electoral Commission produces a file of counts of voters by the SA1 in which they reside and the polling places at which they turned out for House of Representatives elections.   Curiously, summing these counts to the polling place level produces voter turnout counts that do not match the turnout figures published elsewhere by the AEC in official election results.  The SA-1 file generally has higher turnout counts than the AES results data, with these difference larger among (a) declaration votes and (b) in divisions with higher numbers of voters with limited English language proficiency.  Although the discrepancies are small, better understanding their sources would offer reassurance about election integrity, consistent with the norms of transparency and rigour that are enviable hallmarks of Australian election administration. 
+date: now
+date-format: "h:mmA D MMMM YYYY"
+author:
+  - name: "Professor Simon Jackman"
+    orcid: 0000-0001-7421-4034
+    affiliation: "University of Sydney"
+    email: "simonjackman@icloud.com"
+    url: https://simonjackman.netlify.app
+website:
+  google-analytics: 'G-DD0XG6JZDH'
+format:
+  html:
+    theme: cosmo
+    css: highlights.css
+    mainfont: Avenir
+    fontsize: 16px
+    toc: true
+    fig-width: 6.5
+    fig-height: 6.5
+    echo: false
+    code-tools: true
+    smooth-scroll: true
+    page-layout: full
+    embed-resources: true
+    standalone: true
+tbl-cap-location: bottom    
+crossref:
+  tbl-title: Table
+execute:
+  keep-md: false
+  warning: false
+  error: false
+  echo: false
+---
+
+# Summary {.highlights}
+
+<!-- -   SA1 or "Statistical Area 1" is the most granular unit of geography for which the Australian Bureau of Statistics (ABS) provides tabulations of demographic and social characteristics measured on the Census. -->
+
+<!-- -   The ABS uses 61,844 SA1s, of which 60,487 had non-zero population counts in the 2021 Census. The median population of the non-empty SA1s was 406. -->
+
+-   After each federal election, the Australian Electoral Commission (AEC) produces a [data file](https://www.aec.gov.au/Elections/Federal_Elections/2022/files/downloads/2022-federal-election-votes-sa1.csv "AEC SA1 vote statistics") that provides voter turnout counts for the purpose of determining the geographical "catchment" of each polling place (the "SA1 file").   
+
+- The AEC results for the 2022 election reports 15,461,379 House of Representatives votes (including informal ballots) in the 2022 election, 8,346 fewer than the 15,469,725 voters recorded as turning out in the SA1 file.   In aggregate, it would appear that more people are being "marked off" as having voted than actually return ballots. 
+
+- While small in absolute terms, discrepancies between voter turnout counts in the SA1 file and AEC results are larger for (a) declaration votes (b) in divisions with higher numbers of voters with limited English language proficiency.
+
+- We speculate as to mechanisms driving these discrepancies.  Possibilities include 
+  - bad address data
+  - errors by polling officials
+  - voters discarding ballots after being marked off as having turned out
+  - lost ballot papers or vote counting errors
+  - itinerant voters
+  - declaration votes issued but not returned for counting
+
+- Australia has an enviable history of non-partisan, professional election administration.  The AEC is exemplary in making election results for the entire country available in real time.   It is wholly consistent with the AEC's norms of transparancy and rigour to better understand the discrepancies described in this report. Comments from the #auspol community and the AEC would be most welcome.
+
+# The AEC's SA1 file
+
+The AEC has produced a [file](https://www.aec.gov.au/Elections/Federal_Elections/2022/files/downloads/2022-federal-election-votes-sa1.csv "AEC SA1 vote statistics") that provides House of Representatives voter turnout counts from the 2022 election at each of the polling places utilised by the voters residing in small geographic areas.  The file is routinely produced after each election and is often referred to as the polling place "catchment file", since it helps analysts and the AEC itself identify the geographic areas serviced by polling places (the "catchment" area of each polling place). 
+
+In recent years this file has been called the "SA1 file", with "SA1" the standard abbreviation for ["Statistical Area 1"](https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/main-structure-and-greater-capital-city-statistical-areas/statistical-area-level-1), the smallest geographical unit for which the Australian Bureau of Statistics provides aggregates of Census characteristics.
+
+```{r}
+library(knitr)
+library(tidyverse)
+library(here)
+sa1 <-
+  read.csv(file = here("data/2022/SA1/2022-federal-election-votes-sa1.csv")) %>%
+  filter(votes > 0)
+```
+
+The first 25 records of the 2022 SA1 file are:
+
+```{r}
+tmp <- sa1 %>% slice(1:25)
+ojs_define(s = tmp)
+```
+
+```{ojs}
+s2 = transpose(s)
+```
+
+```{ojs}
+Inputs.table(s2, {
+  format: {
+    year: x => x.toFixed(0),
+    ccd_id: x => x.toFixed(0),
+    pp_id:  x => x.toFixed(0),
+  },
+  rows: 35
+})
+```
+
+where
+
+- `ccd_id` corresponds to Census Collection District, a [deprecated](https://www.abs.gov.au/websitedbs/censushome.nsf/4a256353001af3ed4b2562bb00121564/e45142948304157cca257a4b000a6126!OpenDocument) element of the Australian Statistical Geography Standard (ASGS).  This label is an anachronism, since the "CCD" on this file appear to be 7 digit identifiers for SA1s  [("Statistical Area 1")](https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs-edition-3/jul2021-jun2026/main-structure-and-greater-capital-city-statistical-areas/statistical-area-level-1) used in the 2016 Census.  The ABS provides a correspondence mapping from 2016 SA1s to 2021 SA1s.
+
+- `pp_id` and `pp_nm` uniquely identify polling place; a "0" `pp_id` code us used for forms of voter turnout aside from attending a polling places in the voter's electoral division, such as postal or other declaration votes.
+
+# Turnout totals do not match those in AEC results
+
+If the SA1 file does accurately capture voter turnout, then summing the `votes` column in this file ought to correspond to total House of Representatives turnout reported in the [AEC's reporting of election results](https://results.aec.gov.au/27966/Website/HouseDefault-27966.htm).   This is not the case, neither at the level of polling places (in general), electoral divisions, states, nor in aggregate.
+
+```{r}
+theFiles <- list.files(path = here("data/2022/final"),
+                       pattern = "HouseState",
+                       full.names = TRUE)
+aec_results <- list()
+for (f in theFiles) {
+  aec_results[[f]] <- read_csv(file = f, skip = 1)
+}
+aec_results <- bind_rows(aec_results) %>% 
+  rename(pp_id = PollingPlaceID,
+         pp_nm = PollingPlace,
+         div_nm = DivisionNm)
+
+## pick up postals etc
+aec_extra <- read_csv(file = here("data/2022/final/HouseFirstPrefsByCandidateByVoteTypeDownload-27966.csv"),
+                      skip=1) %>% 
+  select(-OrdinaryVotes,-TotalVotes) %>% 
+  rename(div_nm = DivisionNm) %>% 
+  pivot_longer(cols = ends_with("Votes"),
+               names_to = "PollingPlace",
+               values_to = "votes") %>% 
+  select(div_nm,pp_nm = PollingPlace,votes) %>% 
+  mutate(pp_nm = str_remove(pp_nm,"Votes")) %>% 
+  filter(pp_nm != "Total") %>%  ##& pp_nm != "PrePoll") %>% 
+  mutate(pp_nm = if_else(pp_nm == "PrePoll",
+                         "Pre-Poll",
+                         pp_nm)
+         ) %>% 
+  group_by(div_nm,pp_nm) %>% 
+  summarise(v = sum(votes)) %>% 
+  ungroup() %>% 
+  mutate(pp_id = 0)
+
+aec_ppid <- aec_results %>% 
+  group_by(div_nm,pp_id,pp_nm) %>% 
+  summarise(v = sum(OrdinaryVotes)) %>% 
+  ungroup() %>% 
+  bind_rows(aec_extra) %>% 
+  arrange(div_nm,pp_id)
+```
+
+The [AEC records `r format(sum(aec_ppid$v),big.mark=",")` House of Representatives votes (including informal ballots) in the 2022 election](https://results.aec.gov.au/27966/Website/HouseTurnoutByState-27966.htm), `r format(sum(sa1$votes) - sum(aec_ppid$v),big.mark = ",")` fewer than the `r format(sum(sa1$votes),big.mark=",")` votes in the SA1 file.
+
+The total number of discrepancies is small, roughly 8,000 relative to 15.5 million total votes, an error rate on the order of 0.05%, or about 5 in 10,000 or 1 in 1,850 votes.   
+
+On the one hand, this is good news: for every 10,000 citizens recorded as turning out to vote, the AEC winds up with 9,995 ballots to count, all the more remarkable given that voting takes place over a period of weeks and in thousands of locations all over Australia, with the bulk of polling place officials a causal or part-time "surge" workforce.   
+
+But on the other hand, _why_ are there any discrepancies at all?  Where do these discrepancies come from?  What happens to the five out of 10,000 ballots that are issued but then not being added to the vote count, not even as spoiled ballots?   And what might these discrepancies tell us about some subtle elements of the conduct of elections in Australia?
+
+# Possible sources of discrepancies
+
+There is no documentation detailing how the SA1 file is constructed on the AEC web site.
+
+But we can infer that the file originates with data collected as voters present themselves to polling places and are "marked off" against the electoral roll by an AEC official, as mandated by legislation; see [Section 232, *Commonwealth Electoral Act*](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088511).  
+
+## Bad addresses?
+
+One possibility is that the addresses supplied by citizens when enrolling are incomplete or contain errors, not so bad as to be rejected by the AEC and good enough for placing a voter in an electoral division, but with enough error or incompleteness as to make it impossible to geo-code and assign the voter to a SA1.
+
+Analysts working for political parties have access to the electoral roll (see [S90, _CEA_](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088289)). Informal reports from these analysts are that addresses on the roll are not always "clean" enough for unproblematic assignment to SA1s. 
+
+## Errors at polling places?
+
+Turning out in-person on Election Day at a polling place accounted for 45.3% of 2022 turnout, remaining the single most prevalent method of voter turnout as the popularity of pre-polling and postal voting has surged.   Another 33% of 2022 turnout was via in-person voting at a pre-poll voting centre (PPVC).
+
+Both forms of voting begin with an individual presenting themselves to election officials at a polling place. The election official [asks the individual for their name and address](https://www.aec.gov.au/Voting/polling.htm#Questions) [(S229, _CEA_)](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088508) so as to uniquely locate the individual on the certified list (the "roll") of eligible voters for that electoral division.  
+
+Election officials then "mark off" the voter on the roll as having turned out as per S232 _CEA_, a key moment in Australia's system of compulsory turnout, where the citizen is recorded as having fulfilled their _duty to vote_ as prescribed by [S245 _CEA_](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088526).   Given that this is a "one-to-one" matching exercise performed by an election official (locating an individual voter on the electronic roll, appending that information with a record of the voter turning out), how can errors in the turnout count possibly arise?
+
+After verification that the individual presenting themselves is an enrolled voter, the AEC official issues balloting materials to the voter ([S231, *CEA*](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088510)) and the voter's marking of the ballot takes place "in private" ([S233, *CEA*](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088512)). No further check of identity takes place when a ballot is deposited into a ballot box, nor is there any formal check that individuals marked off the roll and issued ballot papers actually *do* return the papers to ballot boxes.
+
+[S339(1)(e)](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_2#_Toc96096416) establishes that to "fraudulently take any ballot paper out of any polling booth or counting center" is an offence. But otherwise failing to place a ballot in a ballot box does *not* appear to be an offence. Indeed, [S238A](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088517) deals with the handling of "discarded ballot papers" by election officials, so clearly the notion that not all issued ballots are deposited in ballot boxes is contemplated by the AEC.
+
+Accordingly, discrepancies between the SA1 file counts and AEC results files _for in-person, polling places_ could arise via
+
+- errors made by election officials when marking off voters against the electoral roll, perhaps "marking off" more than one record on the roll (contributing to an overcount on the SA1 file), or _failing_ to mark off the voter against the roll (contributing to an undercount).
+
+- voters not returning issued ballot papers to ballot boxes (contributing to an overcount in the SA1 file)
+
+- ballot papers being lost after being deposited in ballot boxes (contributing to an overcount in the SA1 file); or
+
+- errors in counting ballot papers (generating overcounts or undercounts relative to the SA1 file)
+
+- the possibility that deliberate errors are introduced by the AEC in constructing the SA1 file, with a small level of random "noise" in the counts so as to protect the anonymity of voters, given that cell counts are small in the SA1 file.
+
+Note that fraudulently voting multiple times (presumably while impersonating another voter, both offences under [S339 _CEA_](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_2#_Toc96096415)) would not generate an overcount in the SA-1 file, but more likely an undercount (more votes going into ballot boxes than there are unique voters presenting themselves to polling places), and perhaps not even that.
+
+## Alternate methods of voting & possible over-counts in the SA1 file
+
+Postal voting accounted for 14.3% of voter turnout in 2022, absent votes 3.2%, declaration pre-polls 3.6% and provisional votes 0.3%.   Details vary across these methods, but all of these methods see the voter providing written information as to their address and/or division of enrolment. How, then, might discrepancies arise between the SA1 turnout counts and the AEC results?   Possibilities include:
+
+- Declaration votes issued by the AEC to voters but not returned.
+
+- Declaration votes issued and returned but rejected during scrutiny for validity (see [Schedule 3, _CEA_](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_2#_Toc96096489)) and not added to the vote count, not even as an informal ballot.   
+
+In both of these cases an _overcount_ on the SA1 file might arise if a voter is "marked off" as having turned out but the ballot is not entered into the count for the reasons given above.
+
+## The curious case of undercounts on the SA1 file
+
+Undercounts on the SA1 file arise when there the SA1 file has a _smaller_ turnout count than in that recorded in the AEC results file.  As we show below, this is an unusual outcome, a situation where there are more ballots recorded in the vote count than there are voters recorded as turning out on the SA-1 file.
+
+One possibility is error by an official at the polling place, neglecting to "mark off" a voter, yet still issuing ballot papers to the voter.  
+
+For declaration votes, perhaps voters requesting declaration or pre-poll ballot are being issued ballot papers from the wrong division, such that they are "marked off" as having voted in their division of enrolment, but wind up casting a ballot in another division (which is rejected at scrutiny).   This would contribute to the AEC results turnout count in a division, without an increment in the SA1 file's count for that polling-place/division.   
+
+This phenomenon also manifests in more Senate votes being received than for the House of Representatives elections; declaration voters who accurately verify their _state_ of residence will have their vote for Senate counted, while those who err in their claim as to their division of enrolment will have their House of Representatives ballot rejected.  We explore if Senate and House turnout differentials explain the discrepancies between the SA1 file's turnout figures and AEC results.   But note that nationally, Senate turnout exceed House turnout by 111,282 (using AEC results), far more than the 8,000 vote discrepancy between House turnout and the SA1 file.
+
+```{r}
+#| label: no-fixed-address
+d_01 <- read_csv(file=here("data/2022/SA1/2021_GCP_SA1_for_AUS_short-header/2021 Census GCP Statistical Area 1 for AUS/2021Census_G01_AUST_SA1.csv")) %>% 
+  mutate(ccd_id = paste0(str_sub(SA1_CODE_2021,1,1),
+                         str_sub(SA1_CODE_2021,6,11))
+         )
+
+nfa <- d_01 %>% 
+  filter(grepl("9949999$",as.character(SA1_CODE_2021))) %>% 
+  mutate(ccd_id = paste0(str_sub(SA1_CODE_2021,1,1),
+                         str_sub(SA1_CODE_2021,6,11))
+         )
+
+
+d_01_16 <- read_csv(
+  file = here("data/2022/SA1/2016_GCP_SA1_for_AUS_short-header/2016 Census GCP Statistical Area 1 for AUST/2016Census_G01_AUS_SA1.csv")
+  ) %>% 
+  mutate(ccd_id = SA1_7DIGITCODE_2016)
+
+nfa_16 <- d_01_16 %>% 
+  filter(grepl("49999$",ccd_id))
+```
+
+
+## Itinerant voters
+Other possible sources of an undercount on the SA1 files are voters lacking a fixed address, and hence unassigned to a conventional SA1.  Consistent with the universalism inherent in Australia's system of compulsory voter enrolment and turnout, the franchise is not restricted to citizens with a fixed place of residence and [S96 _CEA_](https://www.legislation.gov.au/Details/C2022C00074/Html/Volume_1#_Toc96088299) deals with the enrolment of "itinerant electors".   
+
+The ABS uses SA1 codes ending in `49999` for 
+`r format(sum(nfa$Australian_citizen_P),big.mark=",")` Australian citizens counted by the 2021 Census but without a fixed address; the corresponding count on the 2016 Census file (recalling that 2016 SA1s are used by the AEC on the 2022 SA1 turnout file) is
+`r format(sum(nfa_16$Australian_citizen_P),big.mark=",")`.  None of the 2016 ABS SA1 codes for "no fixed address" appear on the SA1 file.  
+
+We should not expect especially high turnout among the adult, citizen, itinerant population.  Nonetheless it seems that any itinerant voters that _do_ turn out would not contribute to the counts on the SA1 file.   In turn, turnout by itinerant electors will push the SA1 file in the direction of a turnout undercount relative to AEC results.
+
+# Discrepancies by polling place & vote type
+
+We sum the vote counts in the SA1 file to the level of division/polling-places and compare the resulting totals to the turnout data provided in the AEC results files:
+
+```{r}
+compareTab <- left_join(
+  aec_ppid,
+  sa1 %>%
+    group_by(div_nm,pp_id,pp_nm) %>%
+    summarise(state = state_ab[1],
+              v = sum(votes)
+              ) %>%
+    ungroup(),
+  by = c("div_nm","pp_id","pp_nm"),
+  suffix = c("_result","_sa1"),
+  ) %>% 
+  filter(!is.na(v_sa1) & !is.na(v_result)) %>% 
+  mutate(delta = v_sa1 - v_result,
+         delta_per = delta/v_result*100) %>% 
+  arrange(desc(abs(delta_per))) 
+
+compare_over <- compareTab %>%
+  filter(delta>0) %>%
+  arrange(desc(delta_per)) %>% 
+  slice(1:20) %>% 
+  select("div_nm","pp_nm","v_sa1","v_result","delta","delta_per")
+
+compare_under <- compareTab %>%
+  filter(delta<0) %>%
+  arrange(delta_per) %>% 
+  slice(1:20) %>% 
+  select("div_nm","pp_nm","v_sa1","v_result","delta","delta_per")
+  
+ojs_define(compare_tab_raw=compareTab)
+ojs_define(compare_under_raw=compare_under)
+```
+
+```{ojs}
+compareTab = transpose(compare_tab_raw)
+```
+
+```{ojs}
+//| label: tbl-pp
+//| tbl-cap: "Foo"
+//| fig-cap: "Discrepancies between SA1 turnout counts and turnout reported in AEC results.  Click on column headers to sort table."
+Inputs.table(compareTab,
+  {
+    rows: 30, 
+    sort: "delta",
+    columns: [
+     "div_nm", "state", "pp_nm",
+     "v_sa1", "v_result",
+     "delta", "delta_per"
+    ],
+    header: {
+      div_nm: "Division",
+      state: "State",
+      pp_nm: "Polling Place",
+      v_result: "AEC results turnout",
+      v_sa1: "SA1 file turnout",
+      delta: "∆",
+      delta_per: "∆%"
+    },
+    format: {
+      delta_per: x => x.toFixed(1),
+  }
+})
+```
+
+```{r}
+#| eval: false
+#| label: tbl-pp-over
+#| tbl-cap: "20 largest over-estimates of turnout in SA1 file relative to AEC results"
+kable(compare_over,
+      digits = c(0,0,0,0,0,1),
+      col.names = c("Division","Polling place",
+                    "Turnout, SA1 file",
+                    "Turnout, SA1 file",
+                    "∆",
+                    "∆ (%)")
+      ) %>% 
+  kableExtra::kable_styling()
+```
+
+```{r}
+#| eval: false
+#| label: tbl-pp-under
+#| tbl-cap: "20 largest under-estimates of turnout in SA1 file relative to AEC results"
+kable(compare_under,
+            digits = c(0,0,0,0,0,1),
+      col.names = c("Division","Polling place",
+                    "Turnout, SA1 file",
+                    "Turnout, AEC result",
+                    "∆",
+                    "∆ (%)")
+      ) %>% 
+  kableExtra::kable_styling()
+```
+
+Larger discrepancies --- both in relative and absolute terms --- are associated with forms of turnout other than in-person voting. Postal votes, absentees, pre-polling and provisional ballots dominate the extremes of the distribution of discrepancies.
+
+We segment the data at the polling place level between conventional in-person, Election Day voting and these other forms of voting and inspect the magnitudes of discrepancies within each segment; see @tbl-compare-tab.
+
+```{r}
+compareTab <- compareTab %>% 
+  mutate(segment = if_else(pp_id == 0 | grepl("PPVC",pp_nm),
+                           "alternative turnout methods",
+                           "in-person, Election Day polling places"))
+
+plotData <- compareTab %>% 
+  mutate(
+    type = case_when(
+      grepl("PPVC",pp_nm) ~ "PPVC",
+      pp_id !=0  ~ "Polling Place",
+      pp_id == 0 & pp_nm == "Absent" ~ "Absent",
+      pp_id == 0 & pp_nm == "Pre-Poll" ~ "Pre-Poll",
+      pp_id == 0 & pp_nm == "Provisional" ~ "Provisional",
+      pp_id == 0 & pp_nm == "Postal" ~ "Postal",
+      TRUE ~ NA_character_
+    )
+  )
+
+delta_zero <- compareTab %>% 
+  group_by(segment) %>% 
+  summarise(s = sum(delta == 0,
+                    na.rm = TRUE)) %>% 
+  ungroup()
+```
+
+```{r}
+#| eval: false
+#| label: fig-delta-ppid-count
+#| fig-cap: "Boxplot summarising error rate in SA1 polling place turnout relative to AEC results, by type of polling place.  Positive/negative discrepancies arise when the counts in the SA1 file are greater/less than the counts in the AEC results."
+ggplot(plotData,
+       aes(x = delta_per,
+           y = type)) + 
+  geom_boxplot() +
+  scale_x_continuous("Discrepancy Rate (%)") + 
+  scale_y_discrete("Type of turnout") + 
+  theme_minimal(base_family = "Avenir") + 
+  theme(panel.grid.minor = element_blank())
+
+
+
+# ggplot(compareTab,
+#        aes(x = delta_per)) + 
+#   geom_histogram() +
+#   scale_y_continuous("Number of polling places") +
+#   scale_x_continuous("Discrepency in turnout counts (% of AEC results)") +
+#   facet_grid(~segment) +
+#   theme_minimal(base_family = "Avenir") + 
+#   theme(panel.grid.minor = element_blank())
+```
+
+
+```{r}
+#| label: tbl-compare-tab
+#| tbl-cap: "Discrepancies by method of turnout or type of polling place. Positive/negative discrepancies correspond to SA1 based counts greater/less than turnout count in AEC results."
+compareTab_tab <- plotData %>%
+  mutate(type = factor(type,
+                       levels = c("Polling Place",
+                                "PPVC",
+                                "Postal",
+                                "Absent",
+                                "Pre-Poll",
+                                "Provisional")
+                       )
+         ) %>% 
+  group_by(type) %>%
+  summarise(
+    n = format(n(), big.mark = ","),
+    "Total discrepancy" = format(sum(delta), big.mark = ","),
+    "Median discrepancy" = as.character(median(delta)),
+    "Maximum discrepancy" = as.character(max(delta)),
+    "Division with max" = div_nm[which.max(delta)],
+    "Minimum discrepancy" = as.character(min(delta)),
+    "Division with min" = div_nm[which.min(delta)],
+    "% with zero discrepancy" = sprintf(mean(delta == 0) * 100,
+                                        fmt = "%.1f"),
+    "% with over-estimate" = sprintf(mean(delta > 0) * 100,
+                                     fmt =
+                                       "%.1f"),
+    "Median error rate (%)" = sprintf(median(delta_per),
+                                      fmt = "%.1f"),
+    "5th percentile" = sprintf(quantile(delta_per, .05),
+                               fmt = "%.1f"),
+    "95th percentile" = sprintf(quantile(delta_per, .95),
+                                fmt =
+                                  "%.1f")
+  ) %>%
+  ungroup() %>%
+  pivot_longer(cols = !"type") %>%
+  pivot_wider(id_cols = "name",
+              names_from = "type",
+              values_from = "value")
+
+   
+kable(compareTab_tab) %>% 
+  kableExtra::kable_styling(font_size = 12)
+```
+
+Most differences are very small. `r format(compareTab %>% filter(delta==0) %>% nrow(),big.mark=",")` polling places have counts that match *exactly* across the SA1 file and the AEC results. Among the `r format(sum(compareTab$segment=="in-person, Election Day polling places"),big.mark=",")` in-person, Election Day, polling places in the data, `r format(delta_zero %>% filter(segment=="in-person, Election Day polling places") %>% pull(s),big.mark=",")` have turnout results that *exactly* match those in the SA1 file.
+
+Declaration voting appears to generate larger error rates, particularly provisional votes and absent votes:
+
+- **provisional votes** tend to produce _undercounts_ of votes in the SA1 based turnout counts relative to AEC results; undercounts are recorded in provisional votes in 73% of divisions.   The division of O'Connor produces the greatest undercount among provisional votes, more than offset by the large overcount among declearation pre-polls in that division.   
+
+- **absentee votes** tend to produce SA1 counts that are _too large_ relative to the AEC results in 84% of divisions.  Curiously, the division of Robertson (NSW) has the largest overcount among absentee turnout, almost exactly offset by the large undercount in declaration prepolls in Roberston.
+
+- **postal voting** almost always produces SA1 based counts that exceed the turnout recorded in AEC results, with _overcounts_ in 95% of divisions.
+
+- in-person voting produces a mix of undercounts and overcounts in the SA1 file that are almost perfectly symmetric, with median error rates close to zero.  A larger range of error rates is observed for turnout at PPVCs.
+
+- Curiously, the division of Melbourne produces the largest undercounts in both polling places _and_ PPVCs.
+
+# Discrepancies by electoral division
+
+We aggregate these polling-place level disparities to the divisional level, listing the results in the following table:
+
+```{r}
+compareTab_div <- left_join(
+  aec_results %>% 
+    rename(v = OrdinaryVotes) %>% 
+    mutate(type = "Ordinary") %>% 
+    bind_rows(aec_extra %>% mutate(type = "Declaration")) %>% 
+    group_by(div_nm) %>% 
+    summarise(v_hor = sum(v)) %>% 
+    ungroup(),
+  # read_csv(file = "https://results.aec.gov.au/27966/Website/Downloads/SenateTurnoutByDivisionDownload-27966.csv",
+  #          skip = 1) %>% 
+  #   select(div_nm = DivisionNm,
+  #          v_sen = Turnout),
+  # by = "div_nm") %>% 
+  # left_join(
+    sa1 %>%
+      group_by(state_ab,div_nm) %>%
+      summarise(v_sa1 = sum(votes)) %>%
+      ungroup() %>%
+      mutate(type = "SA1"),
+    by = c("div_nm")
+    ) %>% 
+  mutate(delta_hor = v_sa1 - v_hor,
+         delta_per = delta_hor/v_hor*100) %>% 
+  ##       delta_sen = v_sa1 - v_sen) %>% 
+  select(div_nm,state_ab,v_sa1,v_hor,delta_hor,delta_per) %>% 
+  arrange(desc(delta_hor))
+
+ojs_define(compareTab_div_ojs = compareTab_div)
+```
+
+```{ojs}
+compareTab_div = transpose(compareTab_div_ojs)
+```
+
+```{ojs}
+Inputs.table(compareTab_div,
+  {
+    rows: 30, 
+    header: {
+      div_nm: "Division",
+      state_ab: "State",
+      v_sa1: "SA1 file turnout",
+      v_hor: "AEC HReps turnout",
+      delta_hor: "Difference",
+      delta_per: "Difference (%)"
+    }
+  }
+)
+```
+
+# Correlates of discrepancies 
+
+Divisions in suburban Sydney produce larger discrepancies in official AEC House turnout and divisional turnout in the SA1 file: Werriwa, Blaxland, Watson, Banks, Kingsford Smith, etc. Higher proportions of NESH voters is one of the distinguishing characteristics of these divisions.   
+
+In the graphs below, we plot the discrepancies (vertical axis) for each of 151 electoral divisions against plausible correlates, including 
+
+- English proficiency
+- non-European ancestry
+- rate of informal voting
+- discrepancy between House and Senate turnout, computed from AEC election results
+
+```{r}
+########################################################
+## fitting functions
+##
+## simon jackman
+## simon.jackman@sydney.edu.au
+## ussc, univ of sydney
+## 2021-09-26 13:06:23
+########################################################
+
+aicc.loess <- function(fit) {
+  # compute AIC_C for a LOESS fit, from:
+  # 
+  # Hurvich, C.M., Simonoff, J.S., and Tsai, C. L. 1998. Smoothing 
+  # parameter selection in nonparametric regression using an improved 
+  # Akaike Information Criterion. Journal of the Royal Statistical 
+  # Society B 60: 271–293.
+  # 
+  # @param fit        loess fit
+  # @return           'aicc' value
+  stopifnot(inherits(fit, 'loess'))
+  # parameters
+  n <- fit$n
+  trace <- fit$trace.hat
+  sigma2 <- sum(resid(fit) ^ 2) / (n - 1)
+  return(log(sigma2) + 1 + (2 * (trace + 1)) / (n - trace - 2))
+}
+
+
+autoloess_wrapper <- function(formula,
+                              data,
+                              family = "symmetric",
+                              degree = 1L,
+                              span = c(.1, .9)) {
+  tfit <- loess(
+    formula = formula,
+    data = data,
+    degree = degree,
+    family = family
+  )
+  
+  autoloess <- function(fit, span) {
+    # compute loess fit which has span minimizes AIC_C
+    #
+    # @param fit        loess fit; span parameter value doesn't matter
+    # @param span       a two-value vector representing the minimum and
+    #                   maximum span values
+    # @return           loess fit with span minimizing the AIC_C function
+    stopifnot(inherits(fit, 'loess'), length(span) == 2)
+    
+    ## loss function in form to be used by optimize
+    f <- function(span)
+      aicc.loess(update(fit, span = span))
+    
+    ## find best loess according to loss function
+    opt_span <- optimize(f, interval = span)$minimum
+    return(update(fit, span = opt_span))
+  }
+  
+  fit <- autoloess(fit = tfit, span = span)
+  return(fit)
+}
+
+
+StatAutoLoess <- ggproto("StatAutoLoess",Stat,
+                         
+                         required_aes = c("x","y"),
+                         
+                         compute_group = function(data,scales,params,
+                                                  formula = y~x,
+                                                  family = "symmetric",
+                                                  degree = 1L,
+                                                  n = 101,
+                                                  span = c(.1,.9)){
+                           rng <- range(data$x, na.rm = TRUE)
+                          
+                           grid <- data.frame(x = seq(rng[1], rng[2], length = n))
+                           
+                           mod <- autoloess_wrapper(formula,data,
+                                                    family = family,
+                                                    degree = degree,
+                                                    span = span)
+                           ##print(mod)
+                           grid$y <- predict(mod,newdata = grid)
+                           
+                           return(grid)
+                         }
+)
+
+auto_loess_standalone <- function(data) {
+  formula <- y ~ x
+  rng <- range(data$x, na.rm = TRUE)
+  n <- 101
+  family <- "symmetric"
+  degree <- 1L
+  n <- length(data$x)
+  span <- c(.1,.9)
+  grid <- data.frame(x = seq(rng[1], rng[2], length = n))
+  
+  mod <- autoloess_wrapper(formula,
+                           data,
+                           family = family,
+                           degree = degree,
+                           span = span)
+  grid$yhat <- predict(mod, newdata = grid)
+  grid <- grid %>% 
+    rename(xhat=x)
+  return(grid)
+}
+
+## a new geom
+stat_auto_loess <- function(mapping = NULL,
+                            data = NULL,
+                            geom = "line",
+                            position = "identity",
+                            na.rm = FALSE,
+                            show.legend = NA,
+                            inherit.aes = TRUE,
+                            formula = y ~ x,
+                            family = "symmetric",
+                            degree = 1L,
+                            n = 101,
+                            span = c(.1, .9),
+                            ...) {
+  layer(
+    stat = StatAutoLoess,
+    data = data,
+    mapping = mapping,
+    geom = geom,
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = list(
+      n = n,
+      formula = formula,
+      family = family,
+      degree = degree,
+      na.rm = na.rm,
+      span = span,
+      ...
+    )
+  )
+}
+
+```
+
+
+```{r}
+senate_turnout_division <-
+  read_csv(
+    url(
+      "https://results.aec.gov.au/27966/Website/Downloads/SenateTurnoutByDivisionDownload-27966.csv"
+    ),
+    skip = 1
+  )
+
+house_turnout_division <-
+  read_csv(
+    url(
+      "https://results.aec.gov.au/27966/Website/Downloads/HouseTurnoutByDivisionDownload-27966.csv"
+    ),
+    skip = 1
+  )
+
+informal <- 
+  read_csv(
+    url(
+      "https://results.aec.gov.au/27966/Website/Downloads/HouseInformalByDivisionDownload-27966.csv"
+    ),
+    skip = 1
+  )
+
+turnout_division <- left_join(
+  house_turnout_division %>%
+    select(
+      div_nm = DivisionNm,
+      state = StateAb,
+      house = Turnout
+    ),
+  senate_turnout_division %>%
+    select(
+      div_nm = DivisionNm,
+      senate = Turnout
+    ),
+  by = "div_nm"
+) %>% 
+  left_join(
+    informal %>%
+      select(
+        div_nm = DivisionNm,
+        informal = InformalVotes,
+        informal_per = InformalPercent
+      ),
+    by = "div_nm"
+  )
+
+compareTab_div <- left_join(
+  aec_results %>% 
+    rename(v = OrdinaryVotes) %>% 
+    mutate(type = "Ordinary") %>% 
+    bind_rows(aec_extra %>% mutate(type = "Declaration")) %>% 
+    group_by(div_nm,type) %>% 
+    summarise(v_hor = sum(v)) %>% 
+    ungroup(),
+  turnout_division,
+  by = "div_nm") %>%
+  left_join(
+    sa1 %>%
+      mutate(type = if_else(pp_id == 0,
+                          "Declaration",
+                          "Ordinary")
+           ) %>% 
+      group_by(state_ab,div_nm,type) %>%
+      summarise(v_sa1 = sum(votes)) %>%
+      ungroup(),
+    by = c("div_nm","type")
+    ) %>% 
+  mutate(delta_hor = v_sa1 - v_hor,
+         delta_per = delta_hor/v_hor*100) %>% 
+  ##       delta_sen = v_sa1 - v_sen) %>% 
+  select(div_nm,state_ab,type,
+         v_sa1,v_hor,
+         delta_hor,delta_per,
+         house_turnout = house,
+         senate_turnout = senate,
+         informal_per) %>% 
+  mutate(delta_turnout = (senate_turnout - house_turnout)/house_turnout * 100) %>% 
+  arrange(desc(delta_hor))
+
+load(here("data/2022/CED_Census/merged.RData"))
+compareTab_div <- compareTab_div %>%
+  left_join(d, by = "div_nm")
+```
+
+```{r}
+#| eval: false
+ggplot(compareTab_div,
+       aes(x = english_only, y = delta_per)) +
+  geom_point() +
+  stat_auto_loess() +
+  facet_grid( ~ type)
+
+ggplot(compareTab_div,
+       aes(x = high_school, y = delta_per)) +
+  geom_point() +
+  stat_auto_loess() +
+  facet_grid( ~ type)
+
+ggplot(compareTab_div,
+       aes(x = same_address_2021, y = delta_per)) +
+  geom_point() +
+  stat_auto_loess() +
+  facet_grid( ~ type)
+
+ggplot(compareTab_div,
+       aes(x = non_europe, y = delta_per)) +
+  geom_point()  +
+  stat_auto_loess() +
+  facet_grid( ~ type)
+
+  geom_smooth(se=FALSE)
+```
+
+```{r}
+dd_long <- compareTab_div %>% 
+  pivot_longer(cols = c("english_only","non_europe","informal_per","delta_turnout"),
+               names_to = "j",
+               values_to = "x") %>% 
+  mutate(j = factor(j,
+                    levels = c("english_only","non_europe","informal_per","delta_turnout"),
+                    labels = c("Proficient in English only",
+                               "Non-European ancestry",
+                               "Informality (House of Reps %)",
+                               "Senate minus House of Reps Turnout (% of House of Reps turnout)"),
+                    ordered = TRUE
+                    )
+         )
+         
+
+
+dd_long_model <- dd_long %>%
+  rename(y = delta_per) %>% 
+  group_nest(j,type) %>% 
+  mutate(m = map(.x = data, .f = ~auto_loess_standalone(.x))) %>% 
+  ungroup() %>% 
+  unnest(c(data,m))
+
+ojs_define(dd_raw = dd_long_model)
+```
+
+```{ojs}
+import {Plot} from "@mkfreeman/plot-tooltip"
+dd = transpose(dd_raw)
+viewof predictor = Inputs.select(dd.map(d => d.j),
+    {
+      label: "Correlate: ",
+      sort: true,
+      unique: true
+    }
+  )
+
+dd_selected = dd.filter(d => d.j === predictor)
+```
+
+
+```{ojs}
+//| label: fig-predictors
+//| fig-cap: "Relationship between characteristic of division and turnout discrepancy; blue line is a loess fit."
+Plot.plot({
+    grid: true,
+    width: 800,
+    height: 460,
+    //insetBottom: 20,
+    //insetTop: 20,
+  
+    style: {
+      fontSize: "11px"
+    },
+  
+    y: {
+    //domain: [-16, 17],
+      ticks: 10,
+      tickFormat: "+",
+      label: "Error rate ↑"
+   },
+  
+    x: {
+      label: predictor + "→",
+      labelOffset: 40
+    },
+
+  facet: {
+    data: dd_selected,
+    x: "type",
+    frame: false,
+    marginTop: 50,
+    marginLeft: 0,
+    //marginRight: 100,
+    label: null,
+    marginBottom: 40
+    },
+    
+  fx: {
+    padding: 0.1,
+    insetLeft: 10,
+    insetRight: 10,
+    label: "Method of Turnout"
+  },
+  
+  fy: {
+    label: false
+    },
+  
+  marks: [
+  
+    Plot.ruleY([0], {stroke: "#333"}),
+    
+    Plot.line(dd_selected, 
+      {
+        x: "xhat",
+        y: "yhat",
+        stroke: "blue",
+        strokeWidth: 3
+      }
+    ),
+  
+    Plot.dot(dd_selected,
+        {
+          x: "x",        
+          y: "y",
+          //r: 4,
+          title: (d) => `${d.div_nm} (${d.state_ab}) \n Error rate: ${d3.format("+.2f")(d.y)}% \n ${predictor}: ${d3.format(".1f")(d.x)}% \n SA-1 file turnout: ${d3.format(",")(d.v_sa1)} \n AEC results turnout: ${d3.format(",")(d.v_hor)}`,
+          stroke: "#555"
+          //fill: (d) => d.incumbent_2022 ? d.color : "transparent"
+        }
+      )
+  ]
+})
+```
+
+
+
