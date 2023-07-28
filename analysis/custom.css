@@ -87,49 +87,49 @@ svg, .observablehq {
 }
 
 .katex {
-  font: normal 1.00em Avenir Next, KaTeX_Main, Times New Roman, serif;
+  font: normal 1.00em Avenir Next, KaTeX_Main, Times New Roman, serif !important;
   line-height: inherit;
 }
 
 .katex .textrm {
   /* font-family: KaTeX_Main; */
-  font-family: Avenir Next;
+  font-family: Avenir Next !important;
 }
 
 .katex .textsf {
-  font-family: KaTeX_SansSerif;
+  font-family: KaTeX_SansSerif !important;
 }
 
 .katex .texttt {
-  font-family: KaTeX_Typewriter;
+  font-family: KaTeX_Typewriter !important;
 }
 
 .katex .mathnormal {
   /* font-family: KaTeX_Math; */
-  font-family: Avenir Next;
-  font-style: italic;
+  font-family: Avenir Next !important;
+  font-style: italic !important;
 }
 
 .katex .mathit {
   /* font-family: KaTeX_Main; */
-  font-family: Avenir Next;
-  font-style: italic;
+  font-family: Avenir Next !important;
+  font-style: italic !important;
 }
 
 .katex .mathrm {
-  font-family: Avenir Next;
-  font-style: normal;
+  font-family: Avenir Next !important;
+  font-style: normal !important;
 }
 
 .katex .mathbf {
   /* font-family: KaTeX_Main; */
-  font-family: Avenir Next;
-  font-weight: bold;
+  font-family: Avenir Next !important;
+  font-weight: bold !important;
 }
 .katex .boldsymbol {
-  font-family: Avenir Next, KaTeX_Math;
-  font-weight: bold;
-  font-style: italic;
+  font-family: Avenir Next, KaTeX_Math !important;
+  font-weight: bold !important;
+  font-style: italic !important;
 }
 .katex .amsrm {
   font-family: KaTeX_AMS;
@@ -168,7 +168,7 @@ svg, .observablehq {
 }
 .katex .mainrm {
   /* font-family: KaTeX_Main; */
-  font-family: Avenir Next;
-  font-style: normal;
+  font-family: Avenir Next !important;
+  font-style: normal !important;
 }
 
